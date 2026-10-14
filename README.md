@@ -38,10 +38,10 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 |---|---|
 | `DB_HOST` / `DB_PORT` / `DB_NAME` | `localhost` / `5432` / `viadeep` |
 | `DB_USER` / `DB_PASSWORD` | `<esquema>_svc` (solo para desarrollo local) |
-| `AUTH_JWKS_URI` | `http://localhost:8081/.well-known/jwks.json` |
+| `AUTH_JWKS_URI` | `http://localhost:8081/auth/.well-known/jwks.json` |
 
 En AWS (ECS Fargate + RDS) estos valores vienen de AWS Secrets Manager; las contraseñas locales no deben usarse fuera de desarrollo.
 
 ## Estado
 
-Esqueleto inicial: estructura de servicios, configuración y base de datos local. La primera funcionalidad a implementar es el servicio de autenticación (registro, login, emisión de JWT RS256 y endpoint JWKS), porque los demás servicios validan su token.
+El servicio de autenticación ya tiene registro, login, emisión de JWT RS256 y endpoint JWKS. Los demás servicios tienen solo su estructura.
