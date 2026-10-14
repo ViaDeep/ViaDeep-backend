@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -15,9 +16,12 @@ import pe.viadeep.auth.application.GetCurrentUserUseCase;
 import pe.viadeep.auth.application.LoginUseCase;
 import pe.viadeep.auth.application.RegisterUserUseCase;
 import pe.viadeep.auth.application.TokenIssuer;
+import pe.viadeep.auth.application.UpdateProfileUseCase;
+import pe.viadeep.auth.presentation.AuthDtos.ChangePasswordRequest;
 import pe.viadeep.auth.presentation.AuthDtos.LoginRequest;
 import pe.viadeep.auth.presentation.AuthDtos.RegisterRequest;
 import pe.viadeep.auth.presentation.AuthDtos.TokenResponse;
+import pe.viadeep.auth.presentation.AuthDtos.UpdateProfileRequest;
 import pe.viadeep.auth.presentation.AuthDtos.UserResponse;
 
 @RestController
@@ -27,11 +31,14 @@ class AuthController {
     private final RegisterUserUseCase registerUser;
     private final LoginUseCase login;
     private final GetCurrentUserUseCase getCurrentUser;
+    private final UpdateProfileUseCase updateProfile;
 
-    AuthController(RegisterUserUseCase registerUser, LoginUseCase login, GetCurrentUserUseCase getCurrentUser) {
+    AuthController(RegisterUserUseCase registerUser, LoginUseCase login, GetCurrentUserUseCase getCurrentUser,
+                   UpdateProfileUseCase updateProfile) {
         this.registerUser = registerUser;
         this.login = login;
         this.getCurrentUser = getCurrentUser;
+        this.updateProfile = updateProfile;
     }
 
     @PostMapping("/register")
@@ -56,5 +63,17 @@ class AuthController {
     @GetMapping("/me")
     UserResponse me(@AuthenticationPrincipal Jwt jwt) {
         return UserResponse.from(getCurrentUser.get(UUID.fromString(jwt.getSubject())));
+    }
+
+    @PutMapping("/me")
+    UserResponse updateMe(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateProfileRequest request) {
+        return UserResponse.from(updateProfile.updateProfile(UUID.fromString(jwt.getSubject()), request.fullName(),
+                request.phone(), request.documentNumber()));
+    }
+
+    @PutMapping("/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void changePassword(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ChangePasswordRequest request) {
+        updateProfile.changePassword(UUID.fromString(jwt.getSubject()), request.currentPassword(), request.newPassword());
     }
 }

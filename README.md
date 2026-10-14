@@ -57,4 +57,4 @@ En AWS (ECS Fargate + RDS) estos valores vienen de AWS Secrets Manager; las cont
 
 ## Estado
 
-Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas), incidencias (registro, estados, severidad, duplicados con PostGIS, estadísticas y distrito automático con OpenStreetMap) y cuentas de operador. Pendiente: el servicio de notificaciones.
+Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas), incidencias (registro, estados, severidad, duplicados con PostGIS, estadísticas y distrito automático con OpenStreetMap) , cuentas de operador y edición del perfil (`PUT /auth/me` y `PUT /auth/me/password`). Pendiente: el servicio de notificaciones.
