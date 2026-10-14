@@ -53,6 +53,7 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 El registro público (`POST /auth/register`) solo crea ciudadanos. Hay dos tipos de cuenta municipal:
 
 - **Administrador.** El encargado que designa la municipalidad. Se crea con las variables `OPERATOR_*` al iniciar el servicio de autenticación. Es el único que da de alta operadores (`POST /auth/operators`) y que lista, activa o desactiva cuentas. También gestiona incidencias como cualquier operador.
+  Puede haber varios administradores: un administrador da o quita el permiso a otro operador con `PATCH /auth/users/{id}/administrator` (`{"administrator": true}`). Nadie puede quitarse su propio permiso ni desactivar su propia cuenta, así que siempre queda al menos uno. La cuenta de `OPERATOR_EMAIL` vuelve a ser administrador cada vez que el servicio arranca: es la cuenta de respaldo de la municipalidad. Un cambio de permiso se aplica cuando la persona vuelve a iniciar sesión (el token anterior dura como máximo `VIADEEP_JWT_TTL`, 1 h por defecto).
 - **Operador.** Solo gestiona incidencias. No puede crear cuentas (403), así que no puede abrirse cuentas extra a su nombre.
 
 El token lleva `role: OPERATOR` en ambos casos (los otros servicios no cambian) y `admin: true` solo en el del administrador.

@@ -46,6 +46,9 @@ final class AuthDtos {
     record ChangeUserStatusRequest(@NotNull Boolean enabled) {
     }
 
+    record ChangeAdministratorRequest(@NotNull Boolean administrator) {
+    }
+
     /** lastLoginAt es null si el usuario nunca inició sesión. */
     record UserResponse(UUID id, String email, String fullName, String role, String phone, String documentNumber,
                         boolean enabled, Instant createdAt, Instant lastLoginAt, boolean passwordChangeRequired,

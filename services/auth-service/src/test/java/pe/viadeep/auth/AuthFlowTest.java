@@ -143,6 +143,32 @@ class AuthFlowTest {
     }
 
     @Test
+    void anAdministratorAppointsAndRemovesOtherAdministrators() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        String adminId = json.readTree(mvc.perform(get("/auth/me").header("Authorization", "Bearer " + adminToken))
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+        String marcoId = json.readTree(createOperator(adminToken, "marco@muni.pe", "Marco Salas", "40000006")
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+        String citizenId = registerNamed("vecina.admin@correo.pe", "Vecina");
+
+        changeAdministrator(adminToken, marcoId, true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.administrator", is(true)));
+        // Con el nuevo token, el segundo administrador ya puede gestionar cuentas, incluso quitarle el permiso al primero.
+        String marcoToken = login("marco@muni.pe", "temporal1");
+        assertThat(SignedJWT.parse(marcoToken).getJWTClaimsSet().getBooleanClaim("admin")).isTrue();
+        mvc.perform(get("/auth/users").header("Authorization", "Bearer " + marcoToken)).andExpect(status().isOk());
+
+        changeAdministrator(marcoToken, marcoId, false).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", is("No puedes quitarte tu propio permiso de administrador")));
+        changeAdministrator(adminToken, citizenId, true).andExpect(status().isUnprocessableEntity());
+
+        changeAdministrator(adminToken, marcoId, false).andExpect(status().isOk())
+                .andExpect(jsonPath("$.administrator", is(false)));
+        String demotedToken = login("marco@muni.pe", "temporal1");
+        changeAdministrator(demotedToken, adminId, false).andExpect(status().isForbidden());
+    }
+
+    @Test
     void aPersonCanOnlyHaveOneOperatorAccount() throws Exception {
         String adminToken = login("operador@muni.pe", "operador123");
         createOperator(adminToken, "jose@muni.pe", "José Paredes", "40000003").andExpect(status().isCreated());
@@ -369,6 +395,11 @@ class AuthFlowTest {
                 .contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "%s", "password": "temporal1", "fullName": "%s", "documentNumber": "%s"}"""
                         .formatted(email, fullName, dni)));
+    }
+
+    private ResultActions changeAdministrator(String token, String id, boolean administrator) throws Exception {
+        return mvc.perform(patch("/auth/users/" + id + "/administrator").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"administrator\": %s}".formatted(administrator)));
     }
 
     private ResultActions changeUserStatus(String token, String id, boolean enabled) throws Exception {

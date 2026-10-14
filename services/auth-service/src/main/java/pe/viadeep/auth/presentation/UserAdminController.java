@@ -15,10 +15,11 @@ import pe.viadeep.auth.application.ManageUsersUseCase;
 import pe.viadeep.auth.application.PageResult;
 import pe.viadeep.auth.application.UserFilter;
 import pe.viadeep.auth.domain.Role;
+import pe.viadeep.auth.presentation.AuthDtos.ChangeAdministratorRequest;
 import pe.viadeep.auth.presentation.AuthDtos.ChangeUserStatusRequest;
 import pe.viadeep.auth.presentation.AuthDtos.UserResponse;
 
-/** Administración de usuarios para los operadores municipales (plataforma web). */
+/** Administración de usuarios desde la plataforma web. Todo menos ver un usuario es solo para administradores. */
 @RestController
 @RequestMapping("/auth/users")
 class UserAdminController {
@@ -48,5 +49,13 @@ class UserAdminController {
     UserResponse changeStatus(@PathVariable UUID id, @Valid @RequestBody ChangeUserStatusRequest request,
                               @AuthenticationPrincipal Jwt jwt) {
         return UserResponse.from(manageUsers.changeStatus(id, request.enabled(), UUID.fromString(jwt.getSubject())));
+    }
+
+    /** Da ({"administrator": true}) o quita el permiso de administrador a un operador. */
+    @PatchMapping("/{id}/administrator")
+    UserResponse changeAdministrator(@PathVariable UUID id, @Valid @RequestBody ChangeAdministratorRequest request,
+                                     @AuthenticationPrincipal Jwt jwt) {
+        return UserResponse.from(manageUsers.changeAdministrator(id, request.administrator(),
+                UUID.fromString(jwt.getSubject())));
     }
 }
