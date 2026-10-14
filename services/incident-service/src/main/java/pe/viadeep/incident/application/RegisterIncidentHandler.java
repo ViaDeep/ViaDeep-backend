@@ -15,22 +15,24 @@ public class RegisterIncidentHandler {
 
     private final IncidentRepository incidents;
     private final EvidenceGateway evidenceGateway;
+    private final DistrictResolver districts;
     private final IncidentProperties properties;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
-    public RegisterIncidentHandler(IncidentRepository incidents, EvidenceGateway evidenceGateway,
+    public RegisterIncidentHandler(IncidentRepository incidents, EvidenceGateway evidenceGateway, DistrictResolver districts,
                                    IncidentProperties properties, ApplicationEventPublisher events, Clock clock) {
         this.incidents = incidents;
         this.evidenceGateway = evidenceGateway;
+        this.districts = districts;
         this.properties = properties;
         this.events = events;
         this.clock = clock;
     }
 
     /**
-     * Verifica que la evidencia exista y sea del ciudadano, crea la incidencia en PENDING y publica
-     * IncidentRegistered con los posibles duplicados cercanos.
+     * Verifica que la evidencia exista y sea del ciudadano, completa el distrito a partir del GPS, crea la incidencia
+     * en PENDING y publica IncidentRegistered con los posibles duplicados cercanos.
      */
     @Transactional
     public Incident handle(RegisterIncidentCommand command) {
@@ -40,9 +42,9 @@ public class RegisterIncidentHandler {
         if (incidents.existsByEvidenceId(evidence.id())) {
             throw new EvidenceRejectedException("La evidencia ya está asociada a otra incidencia");
         }
-        // El distrito se completa en una siguiente etapa con la geocodificación inversa (OpenStreetMap).
+        String district = districts.resolve(command.location()).orElse(null);
         Incident incident = Incident.register(command.reporterId(), evidence.id(), command.type(), command.location(),
-                null, command.description(), command.aiDetection(), clock.instant());
+                district, command.description(), command.aiDetection(), clock.instant());
         List<UUID> duplicates = incidents.findOpenNearby(incident.type(), incident.location(),
                 properties.duplicateRadiusMeters(), incident.id());
         Incident saved = incidents.save(incident);
