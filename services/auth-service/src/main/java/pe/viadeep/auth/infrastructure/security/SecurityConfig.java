@@ -38,9 +38,11 @@ class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/.well-known/jwks.json", "/actuator/health").permitAll()
-                        // Crear, listar y activar o desactivar cuentas es tarea del administrador. Cualquier operador
-                        // puede ver los datos de un usuario (por ejemplo, quién reportó una incidencia).
+                        // Crear, listar, editar y activar o desactivar cuentas es tarea del administrador. Cualquier
+                        // operador puede ver los datos de un usuario (por ejemplo, quién reportó una incidencia) y la
+                        // lista de operadores activos, para asignar incidencias.
                         .requestMatchers(HttpMethod.POST, "/auth/operators").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/auth/operators").hasRole("OPERATOR")
                         .requestMatchers(HttpMethod.GET, "/auth/users/*").hasRole("OPERATOR")
                         .requestMatchers("/auth/users", "/auth/users/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
