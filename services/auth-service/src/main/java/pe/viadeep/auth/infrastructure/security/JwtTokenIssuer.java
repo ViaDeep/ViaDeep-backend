@@ -1,5 +1,6 @@
 package pe.viadeep.auth.infrastructure.security;
 
+import com.nimbusds.jose.jwk.RSAKey;
 import java.time.Clock;
 import java.time.Instant;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -20,11 +21,13 @@ class JwtTokenIssuer implements TokenIssuer {
 
     private final JwtEncoder encoder;
     private final JwtProperties properties;
+    private final String keyId;
     private final Clock clock;
 
-    JwtTokenIssuer(JwtEncoder encoder, JwtProperties properties, Clock clock) {
+    JwtTokenIssuer(JwtEncoder encoder, JwtProperties properties, RSAKey rsaKey, Clock clock) {
         this.encoder = encoder;
         this.properties = properties;
+        this.keyId = rsaKey.getKeyID();
         this.clock = clock;
     }
 
@@ -41,7 +44,7 @@ class JwtTokenIssuer implements TokenIssuer {
                 .claim("role", user.role().name())
                 .claim("admin", user.administrator())
                 .build();
-        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(properties.keyId()).build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keyId).build();
         String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return new IssuedToken(token, properties.ttl().toSeconds());
     }
