@@ -12,4 +12,7 @@ public interface UserRepository {
     Optional<User> findById(UUID id);
 
     boolean existsByEmail(String email);
+
+    /** true si otra cuenta de operador (distinta de exceptUserId) ya usa ese DNI. */
+    boolean operatorDocumentTaken(String documentNumber, UUID exceptUserId);
 }

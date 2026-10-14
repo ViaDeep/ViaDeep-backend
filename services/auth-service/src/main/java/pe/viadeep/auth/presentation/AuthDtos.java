@@ -20,6 +20,13 @@ final class AuthDtos {
             @NotBlank @Size(max = 120) String fullName) {
     }
 
+    record NewOperatorRequest(
+            @NotBlank @Email @Size(max = 254) String email,
+            @NotBlank @Size(min = 8, max = 72) String password,
+            @NotBlank @Size(max = 120) String fullName,
+            @NotBlank @Pattern(regexp = "^\\d{8}$", message = "debe tener 8 dígitos") String documentNumber) {
+    }
+
     record UpdateProfileRequest(
             @NotBlank @Size(max = 120) String fullName,
             @Pattern(regexp = "^$|^9\\d{8}$", message = "debe ser un celular de 9 dígitos que empiece con 9") String phone,
@@ -41,12 +48,13 @@ final class AuthDtos {
 
     /** lastLoginAt es null si el usuario nunca inició sesión. */
     record UserResponse(UUID id, String email, String fullName, String role, String phone, String documentNumber,
-                        boolean enabled, Instant createdAt, Instant lastLoginAt, boolean passwordChangeRequired) {
+                        boolean enabled, Instant createdAt, Instant lastLoginAt, boolean passwordChangeRequired,
+                        boolean administrator) {
 
         static UserResponse from(User user) {
             return new UserResponse(user.id(), user.email(), user.fullName(), user.role().name(),
                     user.phone().orElse(null), user.documentNumber().orElse(null), user.enabled(), user.createdAt(),
-                    user.lastLoginAt().orElse(null), user.passwordChangeRequired());
+                    user.lastLoginAt().orElse(null), user.passwordChangeRequired(), user.administrator());
         }
     }
 }

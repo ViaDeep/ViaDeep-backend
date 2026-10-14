@@ -3,6 +3,7 @@ package pe.viadeep.auth.infrastructure.persistence;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
+import pe.viadeep.auth.domain.Role;
 import pe.viadeep.auth.domain.User;
 import pe.viadeep.auth.domain.UserRepository;
 
@@ -33,5 +34,12 @@ class UserRepositoryJpa implements UserRepository {
     @Override
     public boolean existsByEmail(String email) {
         return jpa.existsByEmail(email);
+    }
+
+    @Override
+    public boolean operatorDocumentTaken(String documentNumber, UUID exceptUserId) {
+        return exceptUserId == null
+                ? jpa.existsByRoleAndDocumentNumber(Role.OPERATOR, documentNumber)
+                : jpa.existsByRoleAndDocumentNumberAndIdNot(Role.OPERATOR, documentNumber, exceptUserId);
     }
 }

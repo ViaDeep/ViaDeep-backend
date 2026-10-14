@@ -8,8 +8,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pe.viadeep.auth.application.AccountDisabledException;
 import pe.viadeep.auth.application.CannotDisableOwnAccountException;
 import pe.viadeep.auth.application.InvalidCredentialsException;
+import pe.viadeep.auth.application.OperatorDocumentLockedException;
 import pe.viadeep.auth.application.OperatorEmailDomainNotAllowedException;
 import pe.viadeep.auth.application.WrongPasswordException;
+import pe.viadeep.auth.domain.DocumentNumberAlreadyRegisteredException;
 import pe.viadeep.auth.domain.EmailAlreadyRegisteredException;
 
 @RestControllerAdvice
@@ -18,6 +20,16 @@ class ApiExceptionHandler {
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
     ProblemDetail emailTaken(EmailAlreadyRegisteredException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(DocumentNumberAlreadyRegisteredException.class)
+    ProblemDetail documentTaken(DocumentNumberAlreadyRegisteredException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(OperatorDocumentLockedException.class)
+    ProblemDetail documentLocked(OperatorDocumentLockedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
     }
 
     @ExceptionHandler(InvalidCredentialsException.class)

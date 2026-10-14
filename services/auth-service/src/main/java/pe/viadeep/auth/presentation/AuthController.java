@@ -18,6 +18,7 @@ import pe.viadeep.auth.application.RegisterUserUseCase;
 import pe.viadeep.auth.application.UpdateProfileUseCase;
 import pe.viadeep.auth.presentation.AuthDtos.ChangePasswordRequest;
 import pe.viadeep.auth.presentation.AuthDtos.LoginRequest;
+import pe.viadeep.auth.presentation.AuthDtos.NewOperatorRequest;
 import pe.viadeep.auth.presentation.AuthDtos.RegisterRequest;
 import pe.viadeep.auth.presentation.AuthDtos.TokenResponse;
 import pe.viadeep.auth.presentation.AuthDtos.UpdateProfileRequest;
@@ -47,13 +48,15 @@ class AuthController {
     }
 
     /**
-     * Solo un operador puede dar de alta a otro operador municipal, con un correo del dominio institucional. La
-     * contraseña es temporal: el nuevo operador debe cambiarla en su primer ingreso.
+     * Solo el administrador da de alta operadores municipales, con un correo del dominio institucional y el DNI de la
+     * persona (una cuenta de operador por DNI). La contraseña es temporal: el nuevo operador debe cambiarla en su
+     * primer ingreso.
      */
     @PostMapping("/operators")
     @ResponseStatus(HttpStatus.CREATED)
-    UserResponse registerOperator(@Valid @RequestBody RegisterRequest request) {
-        return UserResponse.from(registerUser.inviteOperator(request.email(), request.password(), request.fullName()));
+    UserResponse registerOperator(@Valid @RequestBody NewOperatorRequest request) {
+        return UserResponse.from(registerUser.inviteOperator(request.email(), request.password(), request.fullName(),
+                request.documentNumber()));
     }
 
     @PostMapping("/login")
