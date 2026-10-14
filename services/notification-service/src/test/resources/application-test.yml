@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:notifications;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+
+viadeep:
+  internal-api:
+    token: test-internal-token
