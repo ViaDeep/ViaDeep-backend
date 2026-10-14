@@ -3,10 +3,12 @@ package pe.viadeep.incident.presentation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.UUID;
+import pe.viadeep.incident.domain.Assignment;
 import pe.viadeep.incident.domain.Incident;
 import pe.viadeep.incident.domain.IncidentStatus;
 import pe.viadeep.incident.domain.IncidentType;
@@ -45,13 +47,26 @@ final class IncidentDtos {
     record AssignSeverityRequest(@NotNull Severity severity) {
     }
 
+    /** Responsable y área que atenderán la incidencia; la nota es opcional. */
+    record AssignIncidentRequest(
+            @NotBlank @Size(max = 120) String assignee,
+            @NotBlank @Size(max = 120) String area,
+            @Size(max = 500) String note) {
+    }
+
+    /** Los campos de asignación son null mientras la incidencia no tiene responsable. */
     record IncidentResponse(UUID id, IncidentType type, IncidentStatus status, Severity severity, boolean aiValidated,
-                            Instant createdAt, Instant updatedAt) {
+                            Instant createdAt, Instant updatedAt, String assignee, String assignedArea,
+                            String assignmentNote, UUID assignedBy, Instant assignedAt) {
 
         static IncidentResponse from(Incident incident) {
+            Assignment assignment = incident.assignment().orElse(null);
             return new IncidentResponse(incident.id(), incident.type(), incident.status(),
                     incident.severity().orElse(null), incident.aiValidated(), incident.createdAt(),
-                    incident.updatedAt());
+                    incident.updatedAt(), assignment == null ? null : assignment.assignee(),
+                    assignment == null ? null : assignment.area(), assignment == null ? null : assignment.note(),
+                    assignment == null ? null : assignment.assignedBy(),
+                    assignment == null ? null : assignment.assignedAt());
         }
     }
 }

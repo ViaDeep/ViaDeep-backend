@@ -2,8 +2,10 @@ package pe.viadeep.auth.presentation;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 import java.util.UUID;
 import pe.viadeep.auth.domain.User;
 
@@ -33,11 +35,17 @@ final class AuthDtos {
     record TokenResponse(String accessToken, String tokenType, long expiresIn) {
     }
 
-    record UserResponse(UUID id, String email, String fullName, String role, String phone, String documentNumber) {
+    record ChangeUserStatusRequest(@NotNull Boolean enabled) {
+    }
+
+    /** lastLoginAt es null si el usuario nunca inició sesión. */
+    record UserResponse(UUID id, String email, String fullName, String role, String phone, String documentNumber,
+                        boolean enabled, Instant createdAt, Instant lastLoginAt) {
 
         static UserResponse from(User user) {
             return new UserResponse(user.id(), user.email(), user.fullName(), user.role().name(),
-                    user.phone().orElse(null), user.documentNumber().orElse(null));
+                    user.phone().orElse(null), user.documentNumber().orElse(null), user.enabled(), user.createdAt(),
+                    user.lastLoginAt().orElse(null));
         }
     }
 }

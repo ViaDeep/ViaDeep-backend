@@ -35,6 +35,7 @@ class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/.well-known/jwks.json", "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/operators").hasRole("OPERATOR")
+                        .requestMatchers("/auth/users", "/auth/users/**").hasRole("OPERATOR")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(roleConverter())))
                 .build();

@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Agregado raíz del contexto Incidencias: concentra las reglas de estado, severidad e historial. */
+/** Agregado raíz del contexto Incidencias: concentra las reglas de estado, severidad, asignación e historial. */
 public final class Incident {
 
     private final UUID id;
@@ -24,10 +24,11 @@ public final class Incident {
     private IncidentStatus status;
     private Severity severity;
     private Instant updatedAt;
+    private Assignment assignment;
 
     public Incident(UUID id, UUID reporterId, UUID evidenceId, IncidentType type, GeoLocation location, String district,
                     String description, IncidentStatus status, Severity severity, AiDetection aiDetection,
-                    Instant createdAt, Instant updatedAt, List<StatusChange> history) {
+                    Instant createdAt, Instant updatedAt, List<StatusChange> history, Assignment assignment) {
         this.id = Objects.requireNonNull(id);
         this.reporterId = Objects.requireNonNull(reporterId);
         this.evidenceId = Objects.requireNonNull(evidenceId);
@@ -41,6 +42,7 @@ public final class Incident {
         this.createdAt = Objects.requireNonNull(createdAt);
         this.updatedAt = Objects.requireNonNull(updatedAt);
         this.history = new ArrayList<>(history);
+        this.assignment = assignment;
     }
 
     /** Crea la incidencia en PENDING con su primer registro de historial, a nombre de quien la reporta. */
@@ -50,7 +52,7 @@ public final class Incident {
         UUID id = UUID.randomUUID();
         StatusChange initial = new StatusChange(UUID.randomUUID(), null, IncidentStatus.PENDING, reporterId, null, now);
         return new Incident(id, reporterId, evidenceId, type, location, district, cleanDescription,
-                IncidentStatus.PENDING, null, aiDetection, now, now, List.of(initial));
+                IncidentStatus.PENDING, null, aiDetection, now, now, List.of(initial), null);
     }
 
     /** Aplica una transición válida (PENDING → IN_PROGRESS → RESOLVED, PENDING → REJECTED). El rechazo exige motivo. */
@@ -76,6 +78,18 @@ public final class Incident {
         }
         severity = Objects.requireNonNull(newSeverity);
         updatedAt = now;
+    }
+
+    /**
+     * El operador asigna (o reasigna) la incidencia a un responsable y su área. No se permite si ya está cerrada.
+     */
+    public Assignment assign(String assignee, String area, String note, UUID assignedBy, Instant now) {
+        if (!isOpen()) {
+            throw new IncidentClosedException(status);
+        }
+        assignment = new Assignment(assignee, area, note, assignedBy, now);
+        updatedAt = now;
+        return assignment;
     }
 
     public boolean isOpen() {
@@ -132,6 +146,10 @@ public final class Incident {
 
     public Instant updatedAt() {
         return updatedAt;
+    }
+
+    public Optional<Assignment> assignment() {
+        return Optional.ofNullable(assignment);
     }
 
     public List<StatusChange> history() {

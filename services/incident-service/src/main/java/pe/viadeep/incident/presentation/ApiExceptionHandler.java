@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pe.viadeep.incident.application.EvidenceRejectedException;
 import pe.viadeep.incident.application.EvidenceServiceUnavailableException;
+import pe.viadeep.incident.domain.IncidentClosedException;
 import pe.viadeep.incident.domain.IncidentNotFoundException;
 import pe.viadeep.incident.domain.InvalidIncidentException;
 import pe.viadeep.incident.domain.InvalidStatusTransitionException;
@@ -25,6 +26,11 @@ class ApiExceptionHandler {
 
     @ExceptionHandler(InvalidStatusTransitionException.class)
     ProblemDetail invalidTransition(InvalidStatusTransitionException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(IncidentClosedException.class)
+    ProblemDetail incidentClosed(IncidentClosedException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 
