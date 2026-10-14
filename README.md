@@ -42,6 +42,8 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 | `EVIDENCE_SERVICE_URL` | `http://localhost:8083` (lo usa incidencias para validar la evidencia) |
 | `AUTH_JWKS_URI` | `http://localhost:8081/auth/.well-known/jwks.json` |
 | `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` / `OPERATOR_NAME` | vacíos: no se crea operador. Si se definen, autenticación crea al iniciar el primer operador municipal (contraseña de 8 caracteres o más) |
+| `NOTIFICATION_SERVICE_URL` | `http://localhost:8084` (lo usa incidencias para pedir los avisos) |
+| `NOTIFICATIONS_INTERNAL_TOKEN` | `viadeep-dev-internal-token`: clave compartida entre incidencias y notificaciones para crear avisos. En AWS debe ser un secreto propio, igual en ambos servicios |
 | `GEOCODING_ENABLED` | `true`: incidencias obtiene el distrito del GPS con Nominatim (OpenStreetMap) |
 | `GEOCODING_BASE_URL` / `GEOCODING_USER_AGENT` | `https://nominatim.openstreetmap.org` / `ViaDeep/0.1 (...)` |
 
@@ -51,6 +53,10 @@ El registro público (`POST /auth/register`) solo crea ciudadanos. El primer ope
 
 Los operadores administran las cuentas con `GET /auth/users` (filtros `role`, `enabled` y `q`), `GET /auth/users/{id}` y `PATCH /auth/users/{id}/status` (`{"enabled": false}` desactiva la cuenta; nadie puede desactivar la suya). Una cuenta desactivada recibe 403 al iniciar sesión. Ver `services/auth-service/README.md`.
 
+## Notificaciones
+
+Al registrar un reporte o cambiar su estado, incidencias pide el aviso al servicio de notificaciones en segundo plano, después de confirmar la operación (ADR-013): espera como máximo 2 s, reintenta 3 veces y, si el servicio sigue fallando, el circuit breaker deja de llamarlo por 30 s. Si el aviso no se puede enviar, queda en los logs y el reporte no se ve afectado. Para recibir avisos en local, levanta también `mvn -pl services/notification-service spring-boot:run` (puerto 8084).
+
 ## Distrito automático
 
 Al registrar un reporte, incidencias consulta el distrito del punto GPS en Nominatim. Si OpenStreetMap no responde (2 s como máximo) el reporte se registra igual, sin distrito. El servidor público de Nominatim permite como máximo una consulta por segundo; con más tráfico conviene una instancia propia (`GEOCODING_BASE_URL`).
@@ -59,4 +65,4 @@ En AWS (ECS Fargate + RDS) estos valores vienen de AWS Secrets Manager; las cont
 
 ## Estado
 
-Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas), incidencias (registro, estados, severidad, asignación de responsable y área con `PATCH /incidents/{id}/assignment`, duplicados con PostGIS, estadísticas y distrito automático con OpenStreetMap), cuentas de operador, administración de usuarios (`/auth/users`) y edición del perfil (`PUT /auth/me` y `PUT /auth/me/password`). Pendiente: el servicio de notificaciones.
+Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas), incidencias (registro, estados, severidad, asignación de responsable y área con `PATCH /incidents/{id}/assignment`, duplicados con PostGIS, estadísticas y distrito automático con OpenStreetMap), cuentas de operador, administración de usuarios (`/auth/users`) edición del perfil (`PUT /auth/me` y `PUT /auth/me/password`) y notificaciones (avisos de nuevo reporte para los operadores y de cambio de estado o rechazo para el ciudadano, con estado de lectura por usuario).

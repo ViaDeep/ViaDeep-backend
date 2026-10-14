@@ -30,8 +30,8 @@ public class ChangeIncidentStatusHandler {
         Incident incident = incidents.findById(incidentId).orElseThrow(() -> new IncidentNotFoundException(incidentId));
         StatusChange change = incident.changeStatus(target, operatorId, comment, clock.instant());
         Incident saved = incidents.save(incident);
-        events.publishEvent(new IncidentStatusChanged(saved.id(), saved.reporterId(), change.fromStatus(),
-                change.toStatus(), change.comment()));
+        events.publishEvent(new IncidentStatusChanged(saved.id(), saved.reporterId(), saved.type(),
+                saved.district().orElse(null), change.fromStatus(), change.toStatus(), change.comment(), saved.createdAt()));
         return saved;
     }
 }

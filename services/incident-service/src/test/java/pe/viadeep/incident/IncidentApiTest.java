@@ -9,7 +9,10 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -42,6 +45,7 @@ import pe.viadeep.incident.application.DistrictResolver;
 import pe.viadeep.incident.application.EvidenceGateway;
 import pe.viadeep.incident.application.EvidenceGateway.VerifiedEvidence;
 import pe.viadeep.incident.application.EvidenceServiceUnavailableException;
+import pe.viadeep.incident.application.NotificationGateway;
 import pe.viadeep.incident.domain.GeoLocation;
 import pe.viadeep.incident.domain.IncidentRegistered;
 import pe.viadeep.incident.domain.IncidentStatus;
@@ -71,6 +75,9 @@ class IncidentApiTest {
 
     @MockitoBean
     private DistrictResolver districtResolver;
+
+    @MockitoBean
+    private NotificationGateway notificationGateway;
 
     private final UUID citizen = UUID.randomUUID();
     private final UUID operator = UUID.randomUUID();
@@ -179,6 +186,11 @@ class IncidentApiTest {
                 .filteredOn(event -> event.incidentId().toString().equals(id))
                 .extracting(IncidentStatusChanged::toStatus)
                 .containsExactly(IncidentStatus.IN_PROGRESS, IncidentStatus.RESOLVED);
+        // El aviso al ciudadano se solicita en segundo plano, después de confirmar la transacción.
+        verify(notificationGateway, timeout(2000)).statusChanged(argThat(event ->
+                event.incidentId().toString().equals(id) && event.toStatus() == IncidentStatus.RESOLVED
+                        && event.reporterId().equals(citizen)));
+        verify(notificationGateway, timeout(2000)).incidentRegistered(argThat(event -> event.incidentId().toString().equals(id)));
     }
 
     @Test
