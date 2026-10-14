@@ -8,7 +8,10 @@ import pe.viadeep.auth.domain.Role;
 import pe.viadeep.auth.domain.User;
 import pe.viadeep.auth.domain.UserRepository;
 
-/** Registro público: siempre crea ciudadanos. Los operadores municipales se dan de alta por otra vía. */
+/**
+ * Alta de usuarios. El registro público siempre crea ciudadanos; los operadores municipales solo los crea otro
+ * operador o la cuenta inicial que se configura al desplegar.
+ */
 @Service
 public class RegisterUserUseCase {
 
@@ -24,11 +27,20 @@ public class RegisterUserUseCase {
 
     @Transactional
     public User register(String email, String rawPassword, String fullName) {
+        return create(email, rawPassword, fullName, Role.CITIZEN);
+    }
+
+    @Transactional
+    public User registerOperator(String email, String rawPassword, String fullName) {
+        return create(email, rawPassword, fullName, Role.OPERATOR);
+    }
+
+    private User create(String email, String rawPassword, String fullName, Role role) {
         String normalizedEmail = User.normalizeEmail(email);
         if (users.existsByEmail(normalizedEmail)) {
             throw new EmailAlreadyRegisteredException(normalizedEmail);
         }
-        User user = User.register(normalizedEmail, passwordHasher.hash(rawPassword), fullName, Role.CITIZEN, clock.instant());
+        User user = User.register(normalizedEmail, passwordHasher.hash(rawPassword), fullName, role, clock.instant());
         return users.save(user);
     }
 }
