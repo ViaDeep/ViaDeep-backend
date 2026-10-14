@@ -48,7 +48,8 @@ public class RegisterIncidentHandler {
         List<UUID> duplicates = incidents.findOpenNearby(incident.type(), incident.location(),
                 properties.duplicateRadiusMeters(), incident.id());
         Incident saved = incidents.save(incident);
-        events.publishEvent(new IncidentRegistered(saved.id(), saved.reporterId(), saved.type(), duplicates));
+        events.publishEvent(new IncidentRegistered(saved.id(), saved.reporterId(), saved.type(), saved.district().orElse(null),
+                duplicates, saved.createdAt()));
         return saved;
     }
 }
