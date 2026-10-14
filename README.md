@@ -23,7 +23,7 @@ Cada servicio sigue Clean Architecture con cuatro paquetes: `presentation`, `app
 # 1. PostgreSQL + PostGIS (crea los 4 esquemas y sus usuarios) y un emulador local de S3 para las fotos
 docker compose up -d
 
-# 2. Compilar y ejecutar las pruebas
+# 2. Compilar y ejecutar las pruebas (las de incidencias usan el PostGIS del paso 1)
 mvn verify
 
 # 3. Ejecutar un servicio (ejemplo: incidencias)
@@ -39,10 +39,11 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 | `DB_HOST` / `DB_PORT` / `DB_NAME` | `localhost` / `5432` / `viadeep` |
 | `DB_USER` / `DB_PASSWORD` | `<esquema>_svc` (solo para desarrollo local) |
 | `S3_ENDPOINT` / `S3_BUCKET` | `http://localhost:9000` / `viadeep-evidences` (emulador S3 local) |
+| `EVIDENCE_SERVICE_URL` | `http://localhost:8083` (lo usa incidencias para validar la evidencia) |
 | `AUTH_JWKS_URI` | `http://localhost:8081/auth/.well-known/jwks.json` |
 
 En AWS (ECS Fargate + RDS) estos valores vienen de AWS Secrets Manager; las contraseñas locales no deben usarse fuera de desarrollo.
 
 ## Estado
 
-Implementados: autenticación (registro, login, JWT RS256 y JWKS) y evidencias (subida de fotos a S3 y URLs firmadas). Incidencias y notificaciones tienen solo su estructura.
+Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas) e incidencias (registro, estados, severidad, duplicados con PostGIS y estadísticas). Pendientes: geocodificación del distrito con OpenStreetMap y el servicio de notificaciones.
