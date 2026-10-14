@@ -34,6 +34,12 @@ class UserJpaEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(length = 15)
+    private String phone;
+
+    @Column(name = "document_number", length = 8)
+    private String documentNumber;
+
     protected UserJpaEntity() {
     }
 
@@ -45,10 +51,12 @@ class UserJpaEntity {
         entity.fullName = user.fullName();
         entity.role = user.role();
         entity.createdAt = user.createdAt();
+        entity.phone = user.phone().orElse(null);
+        entity.documentNumber = user.documentNumber().orElse(null);
         return entity;
     }
 
     User toDomain() {
-        return new User(id, email, passwordHash, fullName, role, createdAt);
+        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber);
     }
 }
