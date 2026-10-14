@@ -1,0 +1,23 @@
+# Entorno local: PostgreSQL + PostGIS con un esquema por microservicio.
+# Uso: docker compose up -d
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: viadeep-db
+    environment:
+      POSTGRES_DB: viadeep
+      POSTGRES_USER: viadeep
+      POSTGRES_PASSWORD: viadeep
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./infra/db/init:/docker-entrypoint-initdb.d:ro
+      - viadeep-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U viadeep -d viadeep"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  viadeep-db-data:

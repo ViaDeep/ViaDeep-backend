@@ -1,0 +1,28 @@
+server:
+  port: ${PORT:8083}
+
+spring:
+  application:
+    name: evidence-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:viadeep}?currentSchema=evidences
+    username: ${DB_USER:evidences_svc}
+    password: ${DB_PASSWORD:evidences_svc}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: evidences
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
