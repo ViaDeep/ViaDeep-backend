@@ -5,7 +5,7 @@ spring:
   application:
     name: incident-service
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:viadeep}?currentSchema=incidents
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:viadeep}?currentSchema=incidents,public
     username: ${DB_USER:incidents_svc}
     password: ${DB_PASSWORD:incidents_svc}
   jpa:
@@ -20,6 +20,17 @@ spring:
       resourceserver:
         jwt:
           jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/auth/.well-known/jwks.json}
+  flyway:
+    schemas: incidents
+    default-schema: incidents
+
+viadeep:
+  incidents:
+    # Radio (en metros) para buscar posibles duplicados abiertos del mismo tipo.
+    duplicate-radius-meters: ${INCIDENT_DUPLICATE_RADIUS_METERS:30}
+  evidence-service:
+    base-url: ${EVIDENCE_SERVICE_URL:http://localhost:8083}
+    timeout: ${EVIDENCE_SERVICE_TIMEOUT:3s}
 
 management:
   endpoints:
