@@ -1,4 +1,5 @@
-# Entorno local: PostgreSQL + PostGIS con un esquema por microservicio.
+# Entorno local: PostgreSQL + PostGIS con un esquema por microservicio,
+# y un emulador local de Amazon S3 para las fotografías.
 # Uso: docker compose up -d
 services:
   db:
@@ -18,6 +19,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Emulador local de Amazon S3 (moto). Guarda las fotos en memoria: se pierden al reiniciar el contenedor.
+  # El servicio de evidencias crea el bucket al arrancar si no existe.
+  storage:
+    image: motoserver/moto:5.1.0
+    container_name: viadeep-storage
+    ports:
+      - "9000:5000"
 
 volumes:
   viadeep-db-data:
