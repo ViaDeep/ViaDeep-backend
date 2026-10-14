@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import pe.viadeep.incident.application.AssignIncidentHandler;
 import pe.viadeep.incident.application.AssignSeverityHandler;
 import pe.viadeep.incident.application.ChangeIncidentStatusHandler;
 import pe.viadeep.incident.application.RegisterIncidentCommand;
@@ -20,6 +21,7 @@ import pe.viadeep.incident.domain.AiDetection;
 import pe.viadeep.incident.domain.GeoLocation;
 import pe.viadeep.incident.domain.InvalidIncidentException;
 import pe.viadeep.incident.presentation.IncidentDtos.AiResultRequest;
+import pe.viadeep.incident.presentation.IncidentDtos.AssignIncidentRequest;
 import pe.viadeep.incident.presentation.IncidentDtos.AssignSeverityRequest;
 import pe.viadeep.incident.presentation.IncidentDtos.ChangeStatusRequest;
 import pe.viadeep.incident.presentation.IncidentDtos.IncidentResponse;
@@ -33,12 +35,14 @@ class IncidentCommandController {
     private final RegisterIncidentHandler registerIncident;
     private final ChangeIncidentStatusHandler changeStatus;
     private final AssignSeverityHandler assignSeverity;
+    private final AssignIncidentHandler assignIncident;
 
     IncidentCommandController(RegisterIncidentHandler registerIncident, ChangeIncidentStatusHandler changeStatus,
-                              AssignSeverityHandler assignSeverity) {
+                              AssignSeverityHandler assignSeverity, AssignIncidentHandler assignIncident) {
         this.registerIncident = registerIncident;
         this.changeStatus = changeStatus;
         this.assignSeverity = assignSeverity;
+        this.assignIncident = assignIncident;
     }
 
     @PostMapping
@@ -59,6 +63,14 @@ class IncidentCommandController {
     @PatchMapping("/{id}/severity")
     IncidentResponse assignSeverity(@PathVariable UUID id, @Valid @RequestBody AssignSeverityRequest request) {
         return IncidentResponse.from(assignSeverity.handle(id, request.severity()));
+    }
+
+    /** Asigna o reasigna el responsable y el área; queda registrado el operador que lo hizo. */
+    @PatchMapping("/{id}/assignment")
+    IncidentResponse assign(@PathVariable UUID id, @Valid @RequestBody AssignIncidentRequest request,
+                            @AuthenticationPrincipal Jwt jwt) {
+        return IncidentResponse.from(assignIncident.handle(id, request.assignee(), request.area(), request.note(),
+                Jwts.userId(jwt)));
     }
 
     private static AiDetection aiDetection(RegisterIncidentRequest request) {
