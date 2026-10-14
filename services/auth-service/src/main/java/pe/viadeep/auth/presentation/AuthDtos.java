@@ -32,7 +32,8 @@ final class AuthDtos {
     record LoginRequest(@NotBlank String email, @NotBlank String password) {
     }
 
-    record TokenResponse(String accessToken, String tokenType, long expiresIn) {
+    /** passwordChangeRequired es true si la cuenta tiene una contraseña temporal que debe cambiarse ahora. */
+    record TokenResponse(String accessToken, String tokenType, long expiresIn, boolean passwordChangeRequired) {
     }
 
     record ChangeUserStatusRequest(@NotNull Boolean enabled) {
@@ -40,12 +41,12 @@ final class AuthDtos {
 
     /** lastLoginAt es null si el usuario nunca inició sesión. */
     record UserResponse(UUID id, String email, String fullName, String role, String phone, String documentNumber,
-                        boolean enabled, Instant createdAt, Instant lastLoginAt) {
+                        boolean enabled, Instant createdAt, Instant lastLoginAt, boolean passwordChangeRequired) {
 
         static UserResponse from(User user) {
             return new UserResponse(user.id(), user.email(), user.fullName(), user.role().name(),
                     user.phone().orElse(null), user.documentNumber().orElse(null), user.enabled(), user.createdAt(),
-                    user.lastLoginAt().orElse(null));
+                    user.lastLoginAt().orElse(null), user.passwordChangeRequired());
         }
     }
 }

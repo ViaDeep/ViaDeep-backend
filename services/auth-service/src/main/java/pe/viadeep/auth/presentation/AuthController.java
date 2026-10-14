@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 import pe.viadeep.auth.application.GetCurrentUserUseCase;
 import pe.viadeep.auth.application.LoginUseCase;
 import pe.viadeep.auth.application.RegisterUserUseCase;
-import pe.viadeep.auth.application.TokenIssuer;
 import pe.viadeep.auth.application.UpdateProfileUseCase;
 import pe.viadeep.auth.presentation.AuthDtos.ChangePasswordRequest;
 import pe.viadeep.auth.presentation.AuthDtos.LoginRequest;
@@ -47,17 +46,21 @@ class AuthController {
         return UserResponse.from(registerUser.register(request.email(), request.password(), request.fullName()));
     }
 
-    /** Solo un operador puede dar de alta a otro operador municipal. */
+    /**
+     * Solo un operador puede dar de alta a otro operador municipal, con un correo del dominio institucional. La
+     * contraseña es temporal: el nuevo operador debe cambiarla en su primer ingreso.
+     */
     @PostMapping("/operators")
     @ResponseStatus(HttpStatus.CREATED)
     UserResponse registerOperator(@Valid @RequestBody RegisterRequest request) {
-        return UserResponse.from(registerUser.registerOperator(request.email(), request.password(), request.fullName()));
+        return UserResponse.from(registerUser.inviteOperator(request.email(), request.password(), request.fullName()));
     }
 
     @PostMapping("/login")
     TokenResponse login(@Valid @RequestBody LoginRequest request) {
-        TokenIssuer.IssuedToken token = login.login(request.email(), request.password());
-        return new TokenResponse(token.value(), "Bearer", token.expiresInSeconds());
+        LoginUseCase.Session session = login.login(request.email(), request.password());
+        return new TokenResponse(session.token().value(), "Bearer", session.token().expiresInSeconds(),
+                session.passwordChangeRequired());
     }
 
     @GetMapping("/me")
