@@ -31,6 +31,10 @@ viadeep:
     email: ${OPERATOR_EMAIL:}
     password: ${OPERATOR_PASSWORD:}
     full-name: ${OPERATOR_NAME:Operador municipal}
+  # Dominios de correo institucional aceptados para operadores, separados por comas (ej. munlima.gob.pe).
+  # Vacío acepta cualquier correo: solo para desarrollo. En AWS debe configurarse.
+  operators:
+    allowed-email-domains: ${OPERATOR_EMAIL_DOMAINS:}
 
 management:
   endpoints:
