@@ -6,7 +6,9 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pe.viadeep.auth.application.AccountDisabledException;
+import pe.viadeep.auth.application.AdministratorNotAllowedException;
 import pe.viadeep.auth.application.CannotDisableOwnAccountException;
+import pe.viadeep.auth.application.CannotRemoveOwnAdministratorException;
 import pe.viadeep.auth.application.InvalidCredentialsException;
 import pe.viadeep.auth.application.OperatorDocumentLockedException;
 import pe.viadeep.auth.application.OperatorEmailDomainNotAllowedException;
@@ -41,6 +43,16 @@ class ApiExceptionHandler {
     @ExceptionHandler(AccountDisabledException.class)
     ProblemDetail accountDisabled(AccountDisabledException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+    }
+
+    @ExceptionHandler(CannotRemoveOwnAdministratorException.class)
+    ProblemDetail cannotRemoveOwnAdministrator(CannotRemoveOwnAdministratorException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(AdministratorNotAllowedException.class)
+    ProblemDetail administratorNotAllowed(AdministratorNotAllowedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
     }
 
     @ExceptionHandler(CannotDisableOwnAccountException.class)

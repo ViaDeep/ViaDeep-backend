@@ -79,10 +79,14 @@ public final class User {
                 passwordChangeRequired, administrator);
     }
 
-    /** El administrador (el encargado que designa la municipalidad) es el único que gestiona las cuentas. */
+    /** Los administradores (los encargados que designa la municipalidad) son los únicos que gestionan las cuentas. */
     public User asAdministrator() {
+        return withAdministrator(true);
+    }
+
+    public User withAdministrator(boolean administrator) {
         return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
-                passwordChangeRequired, true);
+                passwordChangeRequired, administrator);
     }
 
     private static String blankToNull(String value) {

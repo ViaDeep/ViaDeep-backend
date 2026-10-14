@@ -19,6 +19,7 @@ Autenticación y usuarios: registro, inicio de sesión, perfiles, roles; emite J
 | GET | `/auth/users` | Administrador | Lista paginada de usuarios (`page`, `size` hasta 100), de la cuenta más reciente a la más antigua, con filtros `role` (`CITIZEN` u `OPERATOR`), `enabled` y `q` (nombre o correo, sin distinguir mayúsculas). |
 | GET | `/auth/users/{id}` | Operador | Datos de un usuario; 404 si no existe. |
 | PATCH | `/auth/users/{id}/status` | Administrador | Activa o desactiva la cuenta con `{"enabled": true \| false}`. Nadie puede desactivar su propia cuenta (409). |
+| PATCH | `/auth/users/{id}/administrator` | Administrador | Da o quita el permiso de administrador con `{"administrator": true \| false}`. Solo a operadores activos (422); nadie puede quitarse el suyo (409). |
 | GET | `/auth/.well-known/jwks.json` | Público | Clave pública (JWKS) con la que los demás servicios validan los tokens. |
 
 El token incluye `sub` (id del usuario), `email`, `name`, `role` (`CITIZEN` u `OPERATOR`), `admin` (`true` solo para el administrador) e `iss` (`viadeep-auth`). El registro público solo crea ciudadanos; los operadores los crea el administrador, que es la cuenta inicial (`OPERATOR_*`).
