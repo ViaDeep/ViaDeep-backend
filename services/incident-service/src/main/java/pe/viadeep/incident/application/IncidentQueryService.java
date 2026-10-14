@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.viadeep.incident.application.IncidentViews.IncidentDetail;
 import pe.viadeep.incident.application.IncidentViews.IncidentFilter;
+import pe.viadeep.incident.application.IncidentViews.IncidentSort;
 import pe.viadeep.incident.application.IncidentViews.IncidentSummary;
 import pe.viadeep.incident.application.IncidentViews.PageResult;
 import pe.viadeep.incident.application.IncidentViews.Statistics;
@@ -26,10 +27,11 @@ public class IncidentQueryService {
     }
 
     /** Un ciudadano solo ve sus propios reportes; el operador ve todos. */
-    public PageResult<IncidentSummary> search(IncidentFilter filter, Requester requester, int page, int size) {
-        IncidentFilter scoped = requester.isOperator() ? filter
-                : new IncidentFilter(filter.status(), filter.type(), filter.severity(), filter.district(), requester.userId());
-        return queries.search(scoped, Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE));
+    public PageResult<IncidentSummary> search(IncidentFilter filter, IncidentSort sort, Requester requester, int page,
+                                              int size) {
+        IncidentFilter scoped = requester.isOperator() ? filter : filter.forReporter(requester.userId());
+        return queries.search(scoped, sort == null ? IncidentSort.CREATED_AT : sort, Math.max(page, 0),
+                Math.clamp(size, 1, MAX_PAGE_SIZE));
     }
 
     public IncidentDetail detail(UUID id, Requester requester) {

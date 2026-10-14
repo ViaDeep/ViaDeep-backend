@@ -4,6 +4,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -18,6 +19,7 @@ import pe.viadeep.incident.application.IncidentViews.AiResult;
 import pe.viadeep.incident.application.IncidentViews.HistoryEntry;
 import pe.viadeep.incident.application.IncidentViews.IncidentDetail;
 import pe.viadeep.incident.application.IncidentViews.IncidentFilter;
+import pe.viadeep.incident.application.IncidentViews.IncidentSort;
 import pe.viadeep.incident.application.IncidentViews.IncidentSummary;
 import pe.viadeep.incident.application.IncidentViews.PageResult;
 import pe.viadeep.incident.application.IncidentViews.Statistics;
@@ -33,7 +35,8 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
             SELECT i.id, i.reporter_id, i.evidence_id, t.code, i.status, i.severity,
                    ST_Y(i.location::geometry) AS latitude, ST_X(i.location::geometry) AS longitude,
                    i.district, i.description, i.ai_validated, i.confidence,
-                   i.bbox_x, i.bbox_y, i.bbox_width, i.bbox_height, i.created_at, i.updated_at
+                   i.bbox_x, i.bbox_y, i.bbox_width, i.bbox_height, i.created_at, i.updated_at,
+                   i.assignee, i.assigned_area, i.assignment_note, i.assigned_at
             FROM incidents i JOIN incident_types t ON t.id = i.incident_type_id
             """;
 
@@ -44,7 +47,7 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
     }
 
     @Override
-    public PageResult<IncidentSummary> search(IncidentFilter filter, int page, int size) {
+    public PageResult<IncidentSummary> search(IncidentFilter filter, IncidentSort sort, int page, int size) {
         List<String> conditions = new ArrayList<>();
         Map<String, Object> params = new LinkedHashMap<>();
         if (filter.status() != null) {
@@ -67,18 +70,34 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
             conditions.add("i.reporter_id = :reporterId");
             params.put("reporterId", filter.reporterId());
         }
+        if (filter.assigned() != null) {
+            conditions.add(filter.assigned() ? "i.assignee IS NOT NULL" : "i.assignee IS NULL");
+        }
+        if (filter.createdFrom() != null) {
+            conditions.add("i.created_at >= :createdFrom");
+            params.put("createdFrom", OffsetDateTime.ofInstant(filter.createdFrom(), ZoneOffset.UTC));
+        }
+        if (filter.createdTo() != null) {
+            conditions.add("i.created_at < :createdTo");
+            params.put("createdTo", OffsetDateTime.ofInstant(filter.createdTo(), ZoneOffset.UTC));
+        }
         String where = conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
 
         long total = jdbc.sql("SELECT count(*) FROM incidents i JOIN incident_types t ON t.id = i.incident_type_id" + where)
                 .params(params).query(Long.class).single();
-        List<IncidentSummary> items = jdbc.sql(SELECT + where + " ORDER BY i.created_at DESC LIMIT :limit OFFSET :offset")
+        String orderBy = switch (sort) {
+            case CREATED_AT -> " ORDER BY i.created_at DESC, i.id";
+            case UPDATED_AT -> " ORDER BY i.updated_at DESC, i.created_at DESC, i.id";
+        };
+        List<IncidentSummary> items = jdbc.sql(SELECT + where + orderBy + " LIMIT :limit OFFSET :offset")
                 .params(params)
                 .param("limit", size)
                 .param("offset", (long) page * size)
                 .query((rs, row) -> new IncidentSummary(uuid(rs, "id"), IncidentType.valueOf(rs.getString("code")),
                         IncidentStatus.valueOf(rs.getString("status")), severity(rs), rs.getDouble("latitude"),
                         rs.getDouble("longitude"), rs.getString("district"), rs.getBoolean("ai_validated"),
-                        instant(rs, "created_at")))
+                        instant(rs, "created_at"), instant(rs, "updated_at"), rs.getString("assignee"),
+                        rs.getString("assigned_area"), nullableInstant(rs, "assigned_at")))
                 .list();
         return new PageResult<>(items, page, size, total);
     }
@@ -94,8 +113,8 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
     @Override
     public Statistics statistics(Instant from, Instant to) {
         String where = " WHERE i.created_at >= :from AND i.created_at < :to";
-        Map<String, Object> range = Map.of("from", OffsetDateTime.ofInstant(from, java.time.ZoneOffset.UTC),
-                "to", OffsetDateTime.ofInstant(to, java.time.ZoneOffset.UTC));
+        Map<String, Object> range = Map.of("from", OffsetDateTime.ofInstant(from, ZoneOffset.UTC),
+                "to", OffsetDateTime.ofInstant(to, ZoneOffset.UTC));
 
         Map<IncidentStatus, Long> byStatus = new EnumMap<>(IncidentStatus.class);
         jdbc.sql("SELECT i.status AS k, count(*) AS n FROM incidents i" + where + " GROUP BY i.status")
@@ -117,8 +136,19 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
                 .query(rs -> {
                     byDistrict.put(rs.getString("k"), rs.getLong("n"));
                 });
+        Map<Severity, Long> bySeverity = new EnumMap<>(Severity.class);
+        jdbc.sql("SELECT i.severity AS k, count(*) AS n FROM incidents i" + where
+                        + " AND i.severity IS NOT NULL GROUP BY i.severity")
+                .params(range)
+                .query(rs -> {
+                    bySeverity.put(Severity.valueOf(rs.getString("k")), rs.getLong("n"));
+                });
+        long assigned = jdbc.sql("SELECT count(*) FROM incidents i" + where + " AND i.assignee IS NOT NULL")
+                .params(range)
+                .query(Long.class)
+                .single();
         long total = byStatus.values().stream().mapToLong(Long::longValue).sum();
-        return new Statistics(total, byStatus, byType, byDistrict);
+        return new Statistics(total, byStatus, byType, byDistrict, bySeverity, assigned);
     }
 
     private List<HistoryEntry> history(UUID incidentId) {
@@ -161,7 +191,8 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
                 IncidentType.valueOf(rs.getString("code")), IncidentStatus.valueOf(rs.getString("status")),
                 severity(rs), rs.getDouble("latitude"), rs.getDouble("longitude"), rs.getString("district"),
                 rs.getString("description"), aiValidated, ai, instant(rs, "created_at"), instant(rs, "updated_at"),
-                history, duplicates);
+                rs.getString("assignee"), rs.getString("assigned_area"), rs.getString("assignment_note"),
+                nullableInstant(rs, "assigned_at"), history, duplicates);
     }
 
     private static Severity severity(ResultSet rs) throws SQLException {
@@ -175,5 +206,10 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {
         return rs.getObject(column, OffsetDateTime.class).toInstant();
+    }
+
+    private static Instant nullableInstant(ResultSet rs, String column) throws SQLException {
+        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
+        return value == null ? null : value.toInstant();
     }
 }

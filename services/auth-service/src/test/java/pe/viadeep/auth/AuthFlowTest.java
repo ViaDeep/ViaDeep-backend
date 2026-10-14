@@ -1,8 +1,13 @@
 package pe.viadeep.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -20,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -44,7 +51,10 @@ class AuthFlowTest {
 
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.fullName", is("Ana Quispe")));
+                .andExpect(jsonPath("$.fullName", is("Ana Quispe")))
+                .andExpect(jsonPath("$.enabled", is(true)))
+                .andExpect(jsonPath("$.createdAt", notNullValue()))
+                .andExpect(jsonPath("$.lastLoginAt", notNullValue()));
     }
 
     @Test
@@ -154,6 +164,96 @@ class AuthFlowTest {
     }
 
     @Test
+    void operatorListsFiltersAndReadsUsers() throws Exception {
+        String operatorToken = login("operador@muni.pe", "operador123");
+        String first = registerNamed("elsa.zevallos@correo.pe", "Elsa Zevallos");
+        String second = registerNamed("zevallos.jorge@correo.pe", "Jorge Ramos");
+        login("elsa.zevallos@correo.pe", "secreta123");
+
+        // Busca en nombre o correo sin distinguir mayúsculas; las cuentas más recientes van primero.
+        mvc.perform(get("/auth/users").param("q", "ZEVALLOS").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems", is(2)))
+                .andExpect(jsonPath("$.page", is(0)))
+                .andExpect(jsonPath("$.size", is(20)))
+                .andExpect(jsonPath("$.items[*].id", contains(second, first)))
+                .andExpect(jsonPath("$.items[0].role", is("CITIZEN")))
+                .andExpect(jsonPath("$.items[0].enabled", is(true)))
+                .andExpect(jsonPath("$.items[0].createdAt", notNullValue()))
+                .andExpect(jsonPath("$.items[0].lastLoginAt", nullValue()))
+                .andExpect(jsonPath("$.items[1].lastLoginAt", notNullValue()));
+        mvc.perform(get("/auth/users").param("q", "jorge").param("role", "CITIZEN")
+                        .header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.items[*].id", contains(second)));
+        mvc.perform(get("/auth/users").param("q", "%").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.totalItems", is(0)));
+        mvc.perform(get("/auth/users").param("role", "OPERATOR").param("size", "500")
+                        .header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.size", is(100)))
+                .andExpect(jsonPath("$.items[*].role", everyItem(is("OPERATOR"))));
+
+        mvc.perform(get("/auth/users/" + first).header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email", is("elsa.zevallos@correo.pe")))
+                .andExpect(jsonPath("$.fullName", is("Elsa Zevallos")));
+        mvc.perform(get("/auth/users/" + UUID.randomUUID()).header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isNotFound());
+
+        String citizenToken = login("elsa.zevallos@correo.pe", "secreta123");
+        mvc.perform(get("/auth/users").header("Authorization", "Bearer " + citizenToken))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/auth/users/" + first).header("Authorization", "Bearer " + citizenToken))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/auth/users")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void operatorDisablesAndEnablesAccounts() throws Exception {
+        String operatorToken = login("operador@muni.pe", "operador123");
+        String id = registerNamed("tomas@correo.pe", "Tomás Vega");
+        String citizenToken = login("tomas@correo.pe", "secreta123");
+
+        changeUserStatus(operatorToken, id, false).andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(id)))
+                .andExpect(jsonPath("$.enabled", is(false)));
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "tomas@correo.pe", "password": "secreta123"}"""))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail", is("Tu cuenta está desactivada. Contacta a la municipalidad.")));
+        // Con una contraseña incorrecta no se revela que la cuenta está desactivada.
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "tomas@correo.pe", "password": "incorrecta"}"""))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/auth/users").param("q", "tomas@correo.pe").param("enabled", "false")
+                        .header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.items[*].id", contains(id)));
+        mvc.perform(get("/auth/users").param("q", "tomas@correo.pe").param("enabled", "true")
+                        .header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.totalItems", is(0)));
+
+        changeUserStatus(operatorToken, id, true).andExpect(status().isOk()).andExpect(jsonPath("$.enabled", is(true)));
+        login("tomas@correo.pe", "secreta123");
+
+        changeUserStatus(citizenToken, id, false).andExpect(status().isForbidden());
+        changeUserStatus(operatorToken, UUID.randomUUID().toString(), false).andExpect(status().isNotFound());
+        mvc.perform(patch("/auth/users/" + id + "/status").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void anOperatorCannotDisableTheirOwnAccount() throws Exception {
+        String operatorToken = login("operador@muni.pe", "operador123");
+        String operatorId = json.readTree(mvc.perform(get("/auth/me").header("Authorization", "Bearer " + operatorToken))
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+
+        changeUserStatus(operatorToken, operatorId, false).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", is("No puedes desactivar tu propia cuenta")));
+        changeUserStatus(operatorToken, operatorId, true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled", is(true)));
+    }
+
+    @Test
     void rejectsInvalidRegistrationData() throws Exception {
         mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "no-es-correo", "password": "corta", "fullName": ""}"""))
@@ -164,6 +264,21 @@ class AuthFlowTest {
         mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "%s", "password": "secreta123", "fullName": "Usuario Prueba"}""".formatted(email)))
                 .andExpect(status().isCreated());
+    }
+
+    private String registerNamed(String email, String fullName) throws Exception {
+        String body = mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "%s", "password": "secreta123", "fullName": "%s"}""".formatted(email, fullName)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.enabled", is(true)))
+                .andExpect(jsonPath("$.lastLoginAt", nullValue()))
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(body).get("id").asText();
+    }
+
+    private ResultActions changeUserStatus(String token, String id, boolean enabled) throws Exception {
+        return mvc.perform(patch("/auth/users/" + id + "/status").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\": %s}".formatted(enabled)));
     }
 
     private String login(String email, String password) throws Exception {

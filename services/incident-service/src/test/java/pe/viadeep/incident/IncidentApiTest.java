@@ -6,6 +6,8 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -18,6 +20,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -178,6 +182,75 @@ class IncidentApiTest {
     }
 
     @Test
+    void operatorAssignsAndReassignsAnOpenIncident() throws Exception {
+        String id = idOf(register(citizen, "D40", lat, lng, true));
+
+        assign(id, "Juan Pérez", "Obras Públicas", "Llevar asfalto en frío").andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignee", is("Juan Pérez")))
+                .andExpect(jsonPath("$.assignedArea", is("Obras Públicas")))
+                .andExpect(jsonPath("$.assignmentNote", is("Llevar asfalto en frío")))
+                .andExpect(jsonPath("$.assignedBy", is(operator.toString())))
+                .andExpect(jsonPath("$.assignedAt", notNullValue()))
+                .andExpect(jsonPath("$.status", is("PENDING")));
+        assign(id, "Rosa Díaz", "Mantenimiento vial", null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignee", is("Rosa Díaz")))
+                .andExpect(jsonPath("$.assignmentNote", nullValue()));
+
+        mvc.perform(get("/incidents/" + id).with(as(citizen, "CITIZEN")))
+                .andExpect(jsonPath("$.assignee", is("Rosa Díaz")))
+                .andExpect(jsonPath("$.assignedArea", is("Mantenimiento vial")))
+                .andExpect(jsonPath("$.assignmentNote", nullValue()))
+                .andExpect(jsonPath("$.assignedAt", notNullValue()));
+
+        assign(id, " ", "Obras Públicas", null).andExpect(status().isBadRequest());
+        assign(id, "Juan Pérez", "x".repeat(121), null).andExpect(status().isBadRequest());
+        assign(UUID.randomUUID().toString(), "Juan Pérez", "Obras Públicas", null).andExpect(status().isNotFound());
+        mvc.perform(patch("/incidents/" + id + "/assignment").with(as(citizen, "CITIZEN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"assignee\": \"Juan\", \"area\": \"Obras\"}"))
+                .andExpect(status().isForbidden());
+
+        changeStatus(id, "REJECTED", "Duplicado").andExpect(status().isOk());
+        assign(id, "Juan Pérez", "Obras Públicas", null).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", is("No se puede asignar una incidencia REJECTED")));
+    }
+
+    @Test
+    void listFiltersByAssignmentAndPeriodAndSortsByLastUpdate() throws Exception {
+        UUID someone = UUID.randomUUID();
+        String older = idOf(register(someone, "D10", lat, lng, true));
+        String newer = idOf(register(someone, "D20", lat, lng + 0.01, false));
+        assign(older, "Juan Pérez", "Obras Públicas", null).andExpect(status().isOk());
+
+        mvc.perform(get("/incidents").with(as(someone, "CITIZEN")))
+                .andExpect(jsonPath("$.items[*].id", contains(newer, older)))
+                .andExpect(jsonPath("$.items[0].assignee", nullValue()))
+                .andExpect(jsonPath("$.items[0].updatedAt", notNullValue()))
+                .andExpect(jsonPath("$.items[1].assignee", is("Juan Pérez")))
+                .andExpect(jsonPath("$.items[1].assignedArea", is("Obras Públicas")))
+                .andExpect(jsonPath("$.items[1].assignedAt", notNullValue()));
+        mvc.perform(get("/incidents").param("sort", "updatedAt").with(as(someone, "CITIZEN")))
+                .andExpect(jsonPath("$.items[*].id", contains(older, newer)));
+        mvc.perform(get("/incidents").param("assigned", "true").with(as(someone, "CITIZEN")))
+                .andExpect(jsonPath("$.items[*].id", contains(older)));
+        mvc.perform(get("/incidents").param("assigned", "false").with(as(someone, "CITIZEN")))
+                .andExpect(jsonPath("$.items[*].id", contains(newer)));
+
+        LocalDate today = LocalDate.now(ZoneId.of("America/Lima"));
+        mvc.perform(get("/incidents").param("from", today.toString()).param("to", today.toString())
+                        .with(as(someone, "CITIZEN")))
+                .andExpect(jsonPath("$.totalItems", is(2)));
+        mvc.perform(get("/incidents").param("from", today.plusDays(1).toString()).with(as(someone, "CITIZEN")))
+                .andExpect(jsonPath("$.totalItems", is(0)));
+        mvc.perform(get("/incidents").param("to", today.minusDays(1).toString()).with(as(someone, "CITIZEN")))
+                .andExpect(jsonPath("$.totalItems", is(0)));
+        mvc.perform(get("/incidents").param("from", "2026-10-10").param("to", "2026-10-01")
+                .with(as(someone, "CITIZEN"))).andExpect(status().isBadRequest());
+        mvc.perform(get("/incidents").param("sort", "type").with(as(someone, "CITIZEN")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void rejectionNeedsAReason() throws Exception {
         String id = idOf(register(citizen, "D00", lat, lng, false));
         changeStatus(id, "REJECTED", "").andExpect(status().isBadRequest());
@@ -218,11 +291,17 @@ class IncidentApiTest {
     @Test
     void statisticsCountTheReportsOfThePeriod() throws Exception {
         JsonNode before = stats();
-        register(citizen, "D40", lat, lng, true);
+        String first = idOf(register(citizen, "D40", lat, lng, true));
         register(citizen, "D40", lat, lng + 0.01, false);
+        mvc.perform(patch("/incidents/" + first + "/severity").with(as(operator, "OPERATOR"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"severity\": \"HIGH\"}"))
+                .andExpect(status().isOk());
+        assign(first, "Juan Pérez", "Obras Públicas", null).andExpect(status().isOk());
 
         JsonNode after = stats();
         assertThat(after.get("total").asLong() - before.get("total").asLong()).isEqualTo(2);
+        assertThat(count(after, "bySeverity", "HIGH") - count(before, "bySeverity", "HIGH")).isEqualTo(1);
+        assertThat(after.get("assigned").asLong() - before.get("assigned").asLong()).isEqualTo(1);
         assertThat(count(after, "byType", "D40") - count(before, "byType", "D40")).isEqualTo(2);
         assertThat(count(after, "byStatus", "PENDING") - count(before, "byStatus", "PENDING")).isEqualTo(2);
         assertThat(count(after, "byDistrict", "Sin distrito") - count(before, "byDistrict", "Sin distrito")).isEqualTo(2);
@@ -265,6 +344,13 @@ class IncidentApiTest {
         String body = comment == null ? "{\"status\": \"%s\"}".formatted(status)
                 : "{\"status\": \"%s\", \"comment\": \"%s\"}".formatted(status, comment);
         return mvc.perform(patch("/incidents/" + id + "/status").with(as(operator, "OPERATOR"))
+                .contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private ResultActions assign(String id, String assignee, String area, String note) throws Exception {
+        String body = note == null ? "{\"assignee\": \"%s\", \"area\": \"%s\"}".formatted(assignee, area)
+                : "{\"assignee\": \"%s\", \"area\": \"%s\", \"note\": \"%s\"}".formatted(assignee, area, note);
+        return mvc.perform(patch("/incidents/" + id + "/assignment").with(as(operator, "OPERATOR"))
                 .contentType(MediaType.APPLICATION_JSON).content(body));
     }
 

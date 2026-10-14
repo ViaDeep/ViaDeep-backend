@@ -20,6 +20,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import pe.viadeep.incident.domain.AiDetection;
+import pe.viadeep.incident.domain.Assignment;
 import pe.viadeep.incident.domain.GeoLocation;
 import pe.viadeep.incident.domain.Incident;
 import pe.viadeep.incident.domain.IncidentStatus;
@@ -83,6 +84,21 @@ class IncidentJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(length = 120)
+    private String assignee;
+
+    @Column(name = "assigned_area", length = 120)
+    private String assignedArea;
+
+    @Column(name = "assignment_note", length = 500)
+    private String assignmentNote;
+
+    @Column(name = "assigned_by")
+    private UUID assignedBy;
+
+    @Column(name = "assigned_at")
+    private Instant assignedAt;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "incident_id", nullable = false, updatable = false)
     @OrderBy("changedAt ASC")
@@ -112,14 +128,24 @@ class IncidentJpaEntity {
         });
         entity.createdAt = incident.createdAt();
         entity.updatedAt = incident.updatedAt();
+        incident.assignment().ifPresent(assignment -> {
+            entity.assignee = assignment.assignee();
+            entity.assignedArea = assignment.area();
+            entity.assignmentNote = assignment.note();
+            entity.assignedBy = assignment.assignedBy();
+            entity.assignedAt = assignment.assignedAt();
+        });
         incident.history().forEach(change -> entity.history.add(StatusHistoryJpaEntity.fromDomain(change)));
         return entity;
     }
 
     Incident toDomain() {
         AiDetection ai = aiValidated ? new AiDetection(confidence, bboxX, bboxY, bboxWidth, bboxHeight) : null;
+        Assignment assignment = assignee == null ? null
+                : new Assignment(assignee, assignedArea, assignmentNote, assignedBy, assignedAt);
         return new Incident(id, reporterId, evidenceId, IncidentTypeIds.typeOf(incidentTypeId),
                 new GeoLocation(location.getY(), location.getX()), district, description, status, severity, ai,
-                createdAt, updatedAt, history.stream().map(StatusHistoryJpaEntity::toDomain).toList());
+                createdAt, updatedAt, history.stream().map(StatusHistoryJpaEntity::toDomain).toList(),
+                assignment);
     }
 }
