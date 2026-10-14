@@ -13,3 +13,8 @@ spring:
     schemas: incidents_test
     default-schema: incidents_test
     clean-disabled: false
+
+# Las pruebas no consultan el servidor público de OpenStreetMap.
+viadeep:
+  geocoding:
+    enabled: false

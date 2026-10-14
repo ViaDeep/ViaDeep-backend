@@ -40,6 +40,13 @@ class AuthController {
         return UserResponse.from(registerUser.register(request.email(), request.password(), request.fullName()));
     }
 
+    /** Solo un operador puede dar de alta a otro operador municipal. */
+    @PostMapping("/operators")
+    @ResponseStatus(HttpStatus.CREATED)
+    UserResponse registerOperator(@Valid @RequestBody RegisterRequest request) {
+        return UserResponse.from(registerUser.registerOperator(request.email(), request.password(), request.fullName()));
+    }
+
     @PostMapping("/login")
     TokenResponse login(@Valid @RequestBody LoginRequest request) {
         TokenIssuer.IssuedToken token = login.login(request.email(), request.password());

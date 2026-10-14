@@ -78,6 +78,37 @@ class AuthFlowTest {
     }
 
     @Test
+    void theInitialOperatorExistsAtStartupAndOnlyOperatorsCreateOperators() throws Exception {
+        String operatorToken = login("operador@muni.pe", "operador123");
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.role", is("OPERATOR")))
+                .andExpect(jsonPath("$.fullName", is("Operadora de prueba")));
+
+        String newOperator = """
+                {"email": "Carla@Muni.pe", "password": "operadora1", "fullName": "Carla Huamán"}""";
+        mvc.perform(post("/auth/operators").contentType(MediaType.APPLICATION_JSON).content(newOperator))
+                .andExpect(status().isUnauthorized());
+
+        register("pedro@correo.pe");
+        String citizenToken = login("pedro@correo.pe", "secreta123");
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + citizenToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(newOperator))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(newOperator))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email", is("carla@muni.pe")))
+                .andExpect(jsonPath("$.role", is("OPERATOR")));
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(newOperator))
+                .andExpect(status().isConflict());
+
+        SignedJWT jwt = SignedJWT.parse(login("carla@muni.pe", "operadora1"));
+        assertThat(jwt.getJWTClaimsSet().getStringClaim("role")).isEqualTo("OPERATOR");
+    }
+
+    @Test
     void rejectsInvalidRegistrationData() throws Exception {
         mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "no-es-correo", "password": "corta", "fullName": ""}"""))

@@ -25,6 +25,12 @@ viadeep:
     ttl: ${VIADEEP_JWT_TTL:1h}
     key-id: ${VIADEEP_JWT_KEY_ID:viadeep-auth-1}
     private-key: ${VIADEEP_JWT_PRIVATE_KEY:}
+  # Primer operador municipal, creado al iniciar si se configura y aún no existe. Los demás los crea un operador
+  # con POST /auth/operators.
+  initial-operator:
+    email: ${OPERATOR_EMAIL:}
+    password: ${OPERATOR_PASSWORD:}
+    full-name: ${OPERATOR_NAME:Operador municipal}
 
 management:
   endpoints:
