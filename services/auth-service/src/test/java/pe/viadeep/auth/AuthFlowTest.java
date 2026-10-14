@@ -89,14 +89,17 @@ class AuthFlowTest {
     }
 
     @Test
-    void theInitialOperatorExistsAtStartupAndOnlyOperatorsCreateOperators() throws Exception {
+    void theAdministratorExistsAtStartupAndIsTheOnlyOneWhoCreatesOperators() throws Exception {
         String operatorToken = login("operador@muni.pe", "operador123");
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + operatorToken))
                 .andExpect(jsonPath("$.role", is("OPERATOR")))
+                .andExpect(jsonPath("$.administrator", is(true)))
                 .andExpect(jsonPath("$.fullName", is("Operadora de prueba")));
+        assertThat(SignedJWT.parse(operatorToken).getJWTClaimsSet().getBooleanClaim("admin")).isTrue();
 
         String newOperator = """
-                {"email": "Carla@Muni.pe", "password": "operadora1", "fullName": "Carla Huamán"}""";
+                {"email": "Carla@Muni.pe", "password": "operadora1", "fullName": "Carla Huamán",
+                 "documentNumber": "40000001"}""";
         mvc.perform(post("/auth/operators").contentType(MediaType.APPLICATION_JSON).content(newOperator))
                 .andExpect(status().isUnauthorized());
 
@@ -110,13 +113,67 @@ class AuthFlowTest {
                         .contentType(MediaType.APPLICATION_JSON).content(newOperator))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email", is("carla@muni.pe")))
-                .andExpect(jsonPath("$.role", is("OPERATOR")));
+                .andExpect(jsonPath("$.role", is("OPERATOR")))
+                .andExpect(jsonPath("$.documentNumber", is("40000001")))
+                .andExpect(jsonPath("$.administrator", is(false)));
         mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
                         .contentType(MediaType.APPLICATION_JSON).content(newOperator))
                 .andExpect(status().isConflict());
 
         SignedJWT jwt = SignedJWT.parse(login("carla@muni.pe", "operadora1"));
         assertThat(jwt.getJWTClaimsSet().getStringClaim("role")).isEqualTo("OPERATOR");
+        assertThat(jwt.getJWTClaimsSet().getBooleanClaim("admin")).isFalse();
+    }
+
+    @Test
+    void aRegularOperatorCannotCreateOrManageAccounts() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        createOperator(adminToken, "rosa@muni.pe", "Rosa Quispe", "40000002").andExpect(status().isCreated());
+        String operatorToken = login("rosa@muni.pe", "temporal1");
+        String citizenId = registerNamed("ana.ccori@correo.pe", "Ana Ccori");
+
+        createOperator(operatorToken, "rosa.otra@muni.pe", "Rosa Quispe", "40000099").andExpect(status().isForbidden());
+        mvc.perform(get("/auth/users").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isForbidden());
+        changeUserStatus(operatorToken, citizenId, false).andExpect(status().isForbidden());
+        // Sí puede ver los datos de quien hizo un reporte.
+        mvc.perform(get("/auth/users/" + citizenId).header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName", is("Ana Ccori")));
+    }
+
+    @Test
+    void aPersonCanOnlyHaveOneOperatorAccount() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        createOperator(adminToken, "jose@muni.pe", "José Paredes", "40000003").andExpect(status().isCreated());
+
+        createOperator(adminToken, "jose.paredes@muni.pe", "José Paredes", "40000003")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", is("Ya existe una cuenta de operador con el DNI 40000003")));
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"email": "sin.dni@muni.pe", "password": "temporal1", "fullName": "Sin DNI"}"""))
+                .andExpect(status().isBadRequest());
+
+        // El operador no puede cambiar su DNI desde su perfil.
+        String operatorToken = login("jose@muni.pe", "temporal1");
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"fullName": "José Paredes", "documentNumber": "40000004"}"""))
+                .andExpect(status().isUnprocessableEntity());
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"fullName": "José A. Paredes", "phone": "987654321", "documentNumber": "40000003"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName", is("José A. Paredes")));
+
+        // Un ciudadano puede tener el mismo DNI que un operador: es la misma persona usando la app.
+        register("jose.vecino@correo.pe");
+        String citizenToken = login("jose.vecino@correo.pe", "secreta123");
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + citizenToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"fullName": "José Paredes", "documentNumber": "40000003"}"""))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -124,13 +181,15 @@ class AuthFlowTest {
         String operatorToken = login("operador@muni.pe", "operador123");
         mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
                         .contentType(MediaType.APPLICATION_JSON).content("""
-                                {"email": "luis@gmail.com", "password": "temporal1", "fullName": "Luis Rojas"}"""))
+                                {"email": "luis@gmail.com", "password": "temporal1", "fullName": "Luis Rojas",
+                                 "documentNumber": "40000005"}"""))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail", is("Las cuentas de operador deben usar un correo institucional (@muni.pe)")));
 
         mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
                         .contentType(MediaType.APPLICATION_JSON).content("""
-                                {"email": "luis@muni.pe", "password": "temporal1", "fullName": "Luis Rojas"}"""))
+                                {"email": "luis@muni.pe", "password": "temporal1", "fullName": "Luis Rojas",
+                                 "documentNumber": "40000005"}"""))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.passwordChangeRequired", is(true)));
 
@@ -303,6 +362,13 @@ class AuthFlowTest {
                 .andExpect(jsonPath("$.lastLoginAt", nullValue()))
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(body).get("id").asText();
+    }
+
+    private ResultActions createOperator(String token, String email, String fullName, String dni) throws Exception {
+        return mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "%s", "password": "temporal1", "fullName": "%s", "documentNumber": "%s"}"""
+                        .formatted(email, fullName, dni)));
     }
 
     private ResultActions changeUserStatus(String token, String id, boolean enabled) throws Exception {
