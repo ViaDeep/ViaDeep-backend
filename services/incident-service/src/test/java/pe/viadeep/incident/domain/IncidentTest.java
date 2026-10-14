@@ -72,6 +72,63 @@ class IncidentTest {
     }
 
     @Test
+    void operatorAssignsAndReassignsAnOpenIncident() {
+        Incident incident = newIncident(null);
+        assertThat(incident.assignment()).isEmpty();
+
+        incident.assign(" Juan Pérez ", " Obras Públicas ", "  ", OPERATOR, NOW.plusSeconds(60));
+        assertThat(incident.assignment()).hasValueSatisfying(assignment -> {
+            assertThat(assignment.assignee()).isEqualTo("Juan Pérez");
+            assertThat(assignment.area()).isEqualTo("Obras Públicas");
+            assertThat(assignment.note()).isNull();
+            assertThat(assignment.assignedBy()).isEqualTo(OPERATOR);
+            assertThat(assignment.assignedAt()).isEqualTo(NOW.plusSeconds(60));
+        });
+        assertThat(incident.updatedAt()).isEqualTo(NOW.plusSeconds(60));
+
+        UUID otherOperator = UUID.randomUUID();
+        incident.changeStatus(IncidentStatus.IN_PROGRESS, OPERATOR, null, NOW.plusSeconds(90));
+        incident.assign("Rosa Díaz", "Mantenimiento vial", "Llevar asfalto en frío", otherOperator, NOW.plusSeconds(120));
+        assertThat(incident.assignment()).hasValueSatisfying(assignment -> {
+            assertThat(assignment.assignee()).isEqualTo("Rosa Díaz");
+            assertThat(assignment.note()).isEqualTo("Llevar asfalto en frío");
+            assertThat(assignment.assignedBy()).isEqualTo(otherOperator);
+        });
+        assertThat(incident.updatedAt()).isEqualTo(NOW.plusSeconds(120));
+    }
+
+    @Test
+    void assignmentRequiresAssigneeAndAreaWithinLimits() {
+        Incident incident = newIncident(null);
+        assertThatThrownBy(() -> incident.assign(" ", "Obras", null, OPERATOR, NOW))
+                .isInstanceOf(InvalidIncidentException.class);
+        assertThatThrownBy(() -> incident.assign("Juan", null, null, OPERATOR, NOW))
+                .isInstanceOf(InvalidIncidentException.class);
+        assertThatThrownBy(() -> incident.assign("x".repeat(121), "Obras", null, OPERATOR, NOW))
+                .isInstanceOf(InvalidIncidentException.class);
+        assertThatThrownBy(() -> incident.assign("Juan", "Obras", "x".repeat(501), OPERATOR, NOW))
+                .isInstanceOf(InvalidIncidentException.class);
+        assertThat(incident.assignment()).isEmpty();
+    }
+
+    @Test
+    void closedIncidentsCannotBeAssigned() {
+        Incident rejected = newIncident(null);
+        rejected.changeStatus(IncidentStatus.REJECTED, OPERATOR, "Duplicado", NOW);
+        assertThatThrownBy(() -> rejected.assign("Juan", "Obras", null, OPERATOR, NOW))
+                .isInstanceOf(IncidentClosedException.class)
+                .hasMessage("No se puede asignar una incidencia REJECTED");
+
+        Incident resolved = newIncident(null);
+        resolved.assign("Juan", "Obras", null, OPERATOR, NOW);
+        resolved.changeStatus(IncidentStatus.IN_PROGRESS, OPERATOR, null, NOW);
+        resolved.changeStatus(IncidentStatus.RESOLVED, OPERATOR, null, NOW);
+        assertThatThrownBy(() -> resolved.assign("Rosa", "Obras", null, OPERATOR, NOW.plusSeconds(60)))
+                .isInstanceOf(IncidentClosedException.class);
+        assertThat(resolved.assignment()).map(Assignment::assignee).contains("Juan");
+    }
+
+    @Test
     void validatesCoordinatesAndAiValues() {
         assertThatThrownBy(() -> new GeoLocation(91, 0)).isInstanceOf(InvalidIncidentException.class);
         assertThatThrownBy(() -> new GeoLocation(0, -181)).isInstanceOf(InvalidIncidentException.class);
