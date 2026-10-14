@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -106,6 +107,50 @@ class AuthFlowTest {
 
         SignedJWT jwt = SignedJWT.parse(login("carla@muni.pe", "operadora1"));
         assertThat(jwt.getJWTClaimsSet().getStringClaim("role")).isEqualTo("OPERATOR");
+    }
+
+    @Test
+    void citizenEditsTheProfileAndChangesThePassword() throws Exception {
+        register("maria@correo.pe");
+        String token = login("maria@correo.pe", "secreta123");
+
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName": " María Torres ", "phone": "987654321", "documentNumber": "45678912"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName", is("María Torres")))
+                .andExpect(jsonPath("$.phone", is("987654321")))
+                .andExpect(jsonPath("$.documentNumber", is("45678912")))
+                .andExpect(jsonPath("$.email", is("maria@correo.pe")))
+                .andExpect(jsonPath("$.role", is("CITIZEN")));
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.phone", is("987654321")));
+
+        // Los campos opcionales se pueden vaciar; los formatos inválidos se rechazan.
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName": "María Torres", "phone": "", "documentNumber": null}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phone").doesNotExist());
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName": "María", "phone": "12345", "documentNumber": "abc"}"""))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/auth/me").contentType(MediaType.APPLICATION_JSON).content("{\"fullName\": \"X\"}"))
+                .andExpect(status().isUnauthorized());
+
+        mvc.perform(put("/auth/me/password").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword": "incorrecta", "newPassword": "nuevaclave1"}"""))
+                .andExpect(status().isUnprocessableEntity());
+        mvc.perform(put("/auth/me/password").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword": "secreta123", "newPassword": "nuevaclave1"}"""))
+                .andExpect(status().isNoContent());
+        login("maria@correo.pe", "nuevaclave1");
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "maria@correo.pe", "password": "secreta123"}"""))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
