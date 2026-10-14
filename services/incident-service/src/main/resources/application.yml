@@ -31,6 +31,14 @@ viadeep:
   evidence-service:
     base-url: ${EVIDENCE_SERVICE_URL:http://localhost:8083}
     timeout: ${EVIDENCE_SERVICE_TIMEOUT:3s}
+  notification-service:
+    # Avisos asíncronos (ADR-013): si el servicio no responde, se reintenta y luego se registra en los logs.
+    base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
+    timeout: ${NOTIFICATION_SERVICE_TIMEOUT:2s}
+    internal-token: ${NOTIFICATIONS_INTERNAL_TOKEN:viadeep-dev-internal-token}
+    max-attempts: ${NOTIFICATION_SERVICE_MAX_ATTEMPTS:3}
+    retry-wait: ${NOTIFICATION_SERVICE_RETRY_WAIT:500ms}
+    open-circuit-wait: ${NOTIFICATION_SERVICE_OPEN_CIRCUIT_WAIT:30s}
   geocoding:
     # Distrito automático a partir del GPS con Nominatim (OpenStreetMap). Si falla, el reporte se registra sin distrito.
     enabled: ${GEOCODING_ENABLED:true}
