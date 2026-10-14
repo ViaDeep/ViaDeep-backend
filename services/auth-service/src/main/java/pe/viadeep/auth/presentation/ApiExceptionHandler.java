@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pe.viadeep.auth.application.AccountDisabledException;
 import pe.viadeep.auth.application.CannotDisableOwnAccountException;
 import pe.viadeep.auth.application.InvalidCredentialsException;
+import pe.viadeep.auth.application.OperatorEmailDomainNotAllowedException;
 import pe.viadeep.auth.application.WrongPasswordException;
 import pe.viadeep.auth.domain.EmailAlreadyRegisteredException;
 
@@ -38,6 +39,11 @@ class ApiExceptionHandler {
     /** 422 y no 401: la sesión sigue siendo válida, solo falló la confirmación de la contraseña. */
     @ExceptionHandler(WrongPasswordException.class)
     ProblemDetail wrongPassword(WrongPasswordException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler(OperatorEmailDomainNotAllowedException.class)
+    ProblemDetail operatorEmailDomain(OperatorEmailDomainNotAllowedException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
     }
 

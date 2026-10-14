@@ -120,6 +120,35 @@ class AuthFlowTest {
     }
 
     @Test
+    void operatorsNeedAnInstitutionalEmailAndMustReplaceTheTemporaryPassword() throws Exception {
+        String operatorToken = login("operador@muni.pe", "operador123");
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"email": "luis@gmail.com", "password": "temporal1", "fullName": "Luis Rojas"}"""))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail", is("Las cuentas de operador deben usar un correo institucional (@muni.pe)")));
+
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"email": "luis@muni.pe", "password": "temporal1", "fullName": "Luis Rojas"}"""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.passwordChangeRequired", is(true)));
+
+        String firstLogin = loginBody("luis@muni.pe", "temporal1");
+        assertThat(json.readTree(firstLogin).get("passwordChangeRequired").asBoolean()).isTrue();
+        String token = json.readTree(firstLogin).get("accessToken").asText();
+        mvc.perform(put("/auth/me/password").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"currentPassword": "temporal1", "newPassword": "mi-clave-propia"}"""))
+                .andExpect(status().isNoContent());
+
+        assertThat(json.readTree(loginBody("luis@muni.pe", "mi-clave-propia")).get("passwordChangeRequired").asBoolean())
+                .isFalse();
+        assertThat(json.readTree(loginBody("operador@muni.pe", "operador123")).get("passwordChangeRequired").asBoolean())
+                .isFalse();
+    }
+
+    @Test
     void citizenEditsTheProfileAndChangesThePassword() throws Exception {
         register("maria@correo.pe");
         String token = login("maria@correo.pe", "secreta123");
@@ -282,12 +311,15 @@ class AuthFlowTest {
     }
 
     private String login(String email, String password) throws Exception {
-        String body = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+        JsonNode node = json.readTree(loginBody(email, password));
+        return node.get("accessToken").asText();
+    }
+
+    private String loginBody(String email, String password) throws Exception {
+        return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "%s", "password": "%s"}""".formatted(email, password)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType", is("Bearer")))
                 .andReturn().getResponse().getContentAsString();
-        JsonNode node = json.readTree(body);
-        return node.get("accessToken").asText();
     }
 }

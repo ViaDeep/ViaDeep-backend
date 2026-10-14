@@ -42,6 +42,7 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 | `EVIDENCE_SERVICE_URL` | `http://localhost:8083` (lo usa incidencias para validar la evidencia) |
 | `AUTH_JWKS_URI` | `http://localhost:8081/auth/.well-known/jwks.json` |
 | `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` / `OPERATOR_NAME` | vacíos: no se crea operador. Si se definen, autenticación crea al iniciar el primer operador municipal (contraseña de 8 caracteres o más) |
+| `OPERATOR_EMAIL_DOMAINS` | vacío: acepta cualquier correo (solo desarrollo). Dominios institucionales permitidos para operadores, separados por comas, por ejemplo `munlima.gob.pe` |
 | `NOTIFICATION_SERVICE_URL` | `http://localhost:8084` (lo usa incidencias para pedir los avisos) |
 | `NOTIFICATIONS_INTERNAL_TOKEN` | `viadeep-dev-internal-token`: clave compartida entre incidencias y notificaciones para crear avisos. En AWS debe ser un secreto propio, igual en ambos servicios |
 | `GEOCODING_ENABLED` | `true`: incidencias obtiene el distrito del GPS con Nominatim (OpenStreetMap) |
@@ -50,6 +51,13 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 ## Operadores municipales
 
 El registro público (`POST /auth/register`) solo crea ciudadanos. El primer operador se crea con las variables `OPERATOR_*` al iniciar el servicio de autenticación; ese operador puede dar de alta a otros con `POST /auth/operators` (mismo cuerpo que el registro y su token en `Authorization`).
+
+Para que solo personal de la municipalidad tenga cuenta de operador:
+
+- **Correo institucional.** Con `OPERATOR_EMAIL_DOMAINS` configurado, el operador inicial y los que se den de alta deben usar un correo de esos dominios; otro correo responde 422. No hace falta una lista de correos: el dominio prueba que la cuenta pertenece a la institución.
+- **Contraseña temporal.** La contraseña que pone quien da de alta al operador es temporal. El login responde `passwordChangeRequired: true` (también `GET /auth/me`) hasta que el nuevo operador la cambie con `PUT /auth/me/password`, y la plataforma web no lo deja continuar antes de hacerlo.
+
+La verificación por un enlace enviado al correo no está en el alcance de OB2 (no hay servicio de correo).
 
 Los operadores administran las cuentas con `GET /auth/users` (filtros `role`, `enabled` y `q`), `GET /auth/users/{id}` y `PATCH /auth/users/{id}/status` (`{"enabled": false}` desactiva la cuenta; nadie puede desactivar la suya). Una cuenta desactivada recibe 403 al iniciar sesión. Ver `services/auth-service/README.md`.
 
