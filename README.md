@@ -49,6 +49,8 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 
 El registro público (`POST /auth/register`) solo crea ciudadanos. El primer operador se crea con las variables `OPERATOR_*` al iniciar el servicio de autenticación; ese operador puede dar de alta a otros con `POST /auth/operators` (mismo cuerpo que el registro y su token en `Authorization`).
 
+Los operadores administran las cuentas con `GET /auth/users` (filtros `role`, `enabled` y `q`), `GET /auth/users/{id}` y `PATCH /auth/users/{id}/status` (`{"enabled": false}` desactiva la cuenta; nadie puede desactivar la suya). Una cuenta desactivada recibe 403 al iniciar sesión. Ver `services/auth-service/README.md`.
+
 ## Distrito automático
 
 Al registrar un reporte, incidencias consulta el distrito del punto GPS en Nominatim. Si OpenStreetMap no responde (2 s como máximo) el reporte se registra igual, sin distrito. El servidor público de Nominatim permite como máximo una consulta por segundo; con más tráfico conviene una instancia propia (`GEOCODING_BASE_URL`).
@@ -57,4 +59,4 @@ En AWS (ECS Fargate + RDS) estos valores vienen de AWS Secrets Manager; las cont
 
 ## Estado
 
-Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas), incidencias (registro, estados, severidad, duplicados con PostGIS, estadísticas y distrito automático con OpenStreetMap), cuentas de operador y edición del perfil (`PUT /auth/me` y `PUT /auth/me/password`). Pendiente: el servicio de notificaciones.
+Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas), incidencias (registro, estados, severidad, asignación de responsable y área con `PATCH /incidents/{id}/assignment`, duplicados con PostGIS, estadísticas y distrito automático con OpenStreetMap), cuentas de operador, administración de usuarios (`/auth/users`) y edición del perfil (`PUT /auth/me` y `PUT /auth/me/password`). Pendiente: el servicio de notificaciones.
