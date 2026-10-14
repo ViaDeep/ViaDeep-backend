@@ -18,9 +18,11 @@ public final class User {
     private final String documentNumber;
     private final boolean enabled;
     private final Instant lastLoginAt;
+    private final boolean passwordChangeRequired;
 
     public User(UUID id, String email, String passwordHash, String fullName, Role role, Instant createdAt,
-                String phone, String documentNumber, boolean enabled, Instant lastLoginAt) {
+                String phone, String documentNumber, boolean enabled, Instant lastLoginAt,
+                boolean passwordChangeRequired) {
         this.id = Objects.requireNonNull(id);
         this.email = normalizeEmail(email);
         this.passwordHash = Objects.requireNonNull(passwordHash);
@@ -31,29 +33,44 @@ public final class User {
         this.documentNumber = blankToNull(documentNumber);
         this.enabled = enabled;
         this.lastLoginAt = lastLoginAt;
+        this.passwordChangeRequired = passwordChangeRequired;
     }
 
     /** Las cuentas nuevas nacen activas y sin inicios de sesión. */
     public static User register(String email, String passwordHash, String fullName, Role role, Instant now) {
-        return new User(UUID.randomUUID(), email, passwordHash, fullName, role, now, null, null, true, null);
+        return new User(UUID.randomUUID(), email, passwordHash, fullName, role, now, null, null, true, null, false);
+    }
+
+    /**
+     * Operador dado de alta por otro operador: la contraseña la eligió quien lo registró, así que es temporal y debe
+     * cambiarla en su primer ingreso.
+     */
+    public static User inviteOperator(String email, String temporaryPasswordHash, String fullName, Instant now) {
+        return new User(UUID.randomUUID(), email, temporaryPasswordHash, fullName, Role.OPERATOR, now, null, null, true,
+                null, true);
     }
 
     /** Datos que el propio usuario puede editar. El correo y el rol no cambian. */
     public User withProfile(String fullName, String phone, String documentNumber) {
-        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt);
+        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
+                passwordChangeRequired);
     }
 
+    /** Al elegir su propia contraseña deja de tener una temporal. */
     public User withPasswordHash(String passwordHash) {
-        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt);
+        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
+                false);
     }
 
     /** Un operador activa o desactiva la cuenta; una cuenta desactivada no puede iniciar sesión. */
     public User withEnabled(boolean enabled) {
-        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt);
+        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
+                passwordChangeRequired);
     }
 
     public User withLastLoginAt(Instant lastLoginAt) {
-        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt);
+        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
+                passwordChangeRequired);
     }
 
     private static String blankToNull(String value) {
@@ -99,6 +116,11 @@ public final class User {
 
     public boolean enabled() {
         return enabled;
+    }
+
+    /** true mientras el usuario tenga la contraseña temporal que le asignaron. */
+    public boolean passwordChangeRequired() {
+        return passwordChangeRequired;
     }
 
     /** Último inicio de sesión exitoso; vacío si nunca inició sesión. */

@@ -46,6 +46,9 @@ class UserJpaEntity {
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    @Column(name = "password_change_required", nullable = false)
+    private boolean passwordChangeRequired;
+
     protected UserJpaEntity() {
     }
 
@@ -61,10 +64,12 @@ class UserJpaEntity {
         entity.documentNumber = user.documentNumber().orElse(null);
         entity.enabled = user.enabled();
         entity.lastLoginAt = user.lastLoginAt().orElse(null);
+        entity.passwordChangeRequired = user.passwordChangeRequired();
         return entity;
     }
 
     User toDomain() {
-        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt);
+        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
+                passwordChangeRequired);
     }
 }

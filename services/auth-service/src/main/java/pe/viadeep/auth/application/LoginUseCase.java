@@ -26,13 +26,18 @@ public class LoginUseCase {
      * quien no conoce su contraseña. Registra la fecha del inicio de sesión.
      */
     @Transactional
-    public TokenIssuer.IssuedToken login(String email, String rawPassword) {
+    public Session login(String email, String rawPassword) {
         User user = users.findByEmail(User.normalizeEmail(email))
                 .filter(found -> passwordHasher.matches(rawPassword, found.passwordHash()))
                 .orElseThrow(InvalidCredentialsException::new);
         if (!user.enabled()) {
             throw new AccountDisabledException();
         }
-        return tokenIssuer.issue(users.save(user.withLastLoginAt(clock.instant())));
+        User saved = users.save(user.withLastLoginAt(clock.instant()));
+        return new Session(tokenIssuer.issue(saved), saved.passwordChangeRequired());
+    }
+
+    /** Token emitido y si el usuario debe cambiar su contraseña temporal antes de continuar. */
+    public record Session(TokenIssuer.IssuedToken token, boolean passwordChangeRequired) {
     }
 }
