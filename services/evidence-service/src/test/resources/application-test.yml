@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:evidences;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+
+viadeep:
+  evidence:
+    max-size-bytes: 1024
+  s3:
+    # Las pruebas usan un almacenamiento en memoria; sin endpoint no se intenta crear el bucket.
+    endpoint:
+    access-key: test
+    secret-key: test
