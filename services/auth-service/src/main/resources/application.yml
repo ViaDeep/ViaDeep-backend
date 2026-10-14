@@ -15,6 +15,16 @@ spring:
     properties:
       hibernate:
         default_schema: auth
+  flyway:
+    schemas: auth
+    default-schema: auth
+
+viadeep:
+  jwt:
+    issuer: ${VIADEEP_JWT_ISSUER:viadeep-auth}
+    ttl: ${VIADEEP_JWT_TTL:1h}
+    key-id: ${VIADEEP_JWT_KEY_ID:viadeep-auth-1}
+    private-key: ${VIADEEP_JWT_PRIVATE_KEY:}
 
 management:
   endpoints:
