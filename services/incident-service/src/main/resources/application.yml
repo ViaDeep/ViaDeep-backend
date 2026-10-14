@@ -19,7 +19,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/.well-known/jwks.json}
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/auth/.well-known/jwks.json}
 
 management:
   endpoints:
