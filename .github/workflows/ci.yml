@@ -8,6 +8,21 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      # Las pruebas del servicio de incidencias usan PostGIS real (consultas espaciales).
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: viadeep
+          POSTGRES_USER: viadeep
+          POSTGRES_PASSWORD: viadeep
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U viadeep -d viadeep"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
