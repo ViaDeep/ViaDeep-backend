@@ -31,6 +31,12 @@ viadeep:
   evidence-service:
     base-url: ${EVIDENCE_SERVICE_URL:http://localhost:8083}
     timeout: ${EVIDENCE_SERVICE_TIMEOUT:3s}
+  geocoding:
+    # Distrito automático a partir del GPS con Nominatim (OpenStreetMap). Si falla, el reporte se registra sin distrito.
+    enabled: ${GEOCODING_ENABLED:true}
+    base-url: ${GEOCODING_BASE_URL:https://nominatim.openstreetmap.org}
+    user-agent: ${GEOCODING_USER_AGENT:ViaDeep/0.1 (tesis UPC; reportes viales Lima)}
+    timeout: ${GEOCODING_TIMEOUT:2s}
 
 management:
   endpoints:
