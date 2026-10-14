@@ -41,9 +41,20 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 | `S3_ENDPOINT` / `S3_BUCKET` | `http://localhost:9000` / `viadeep-evidences` (emulador S3 local) |
 | `EVIDENCE_SERVICE_URL` | `http://localhost:8083` (lo usa incidencias para validar la evidencia) |
 | `AUTH_JWKS_URI` | `http://localhost:8081/auth/.well-known/jwks.json` |
+| `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` / `OPERATOR_NAME` | vacíos: no se crea operador. Si se definen, autenticación crea al iniciar el primer operador municipal (contraseña de 8 caracteres o más) |
+| `GEOCODING_ENABLED` | `true`: incidencias obtiene el distrito del GPS con Nominatim (OpenStreetMap) |
+| `GEOCODING_BASE_URL` / `GEOCODING_USER_AGENT` | `https://nominatim.openstreetmap.org` / `ViaDeep/0.1 (...)` |
+
+## Operadores municipales
+
+El registro público (`POST /auth/register`) solo crea ciudadanos. El primer operador se crea con las variables `OPERATOR_*` al iniciar el servicio de autenticación; ese operador puede dar de alta a otros con `POST /auth/operators` (mismo cuerpo que el registro y su token en `Authorization`).
+
+## Distrito automático
+
+Al registrar un reporte, incidencias consulta el distrito del punto GPS en Nominatim. Si OpenStreetMap no responde (2 s como máximo) el reporte se registra igual, sin distrito. El servidor público de Nominatim permite como máximo una consulta por segundo; con más tráfico conviene una instancia propia (`GEOCODING_BASE_URL`).
 
 En AWS (ECS Fargate + RDS) estos valores vienen de AWS Secrets Manager; las contraseñas locales no deben usarse fuera de desarrollo.
 
 ## Estado
 
-Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas) e incidencias (registro, estados, severidad, duplicados con PostGIS y estadísticas). Pendientes: geocodificación del distrito con OpenStreetMap y el servicio de notificaciones.
+Implementados: autenticación (registro, login, JWT RS256 y JWKS), evidencias (subida de fotos a S3 y URLs firmadas), incidencias (registro, estados, severidad, duplicados con PostGIS, estadísticas y distrito automático con OpenStreetMap) y cuentas de operador. Pendiente: el servicio de notificaciones.

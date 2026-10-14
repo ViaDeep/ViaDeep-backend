@@ -6,7 +6,6 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -35,9 +34,11 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import pe.viadeep.incident.application.DistrictResolver;
 import pe.viadeep.incident.application.EvidenceGateway;
 import pe.viadeep.incident.application.EvidenceGateway.VerifiedEvidence;
 import pe.viadeep.incident.application.EvidenceServiceUnavailableException;
+import pe.viadeep.incident.domain.GeoLocation;
 import pe.viadeep.incident.domain.IncidentRegistered;
 import pe.viadeep.incident.domain.IncidentStatus;
 import pe.viadeep.incident.domain.IncidentStatusChanged;
@@ -64,6 +65,9 @@ class IncidentApiTest {
     @MockitoBean
     private EvidenceGateway evidenceGateway;
 
+    @MockitoBean
+    private DistrictResolver districtResolver;
+
     private final UUID citizen = UUID.randomUUID();
     private final UUID operator = UUID.randomUUID();
     // Cada prueba usa un punto distinto de Lima para no detectar duplicados de otras pruebas.
@@ -72,6 +76,7 @@ class IncidentApiTest {
 
     @Test
     void citizenRegistersAnAiValidatedReportAndSeesItsDetail() throws Exception {
+        when(districtResolver.resolve(new GeoLocation(lat, lng))).thenReturn(Optional.of("Miraflores"));
         String id = register(citizen, "D40", lat, lng, true).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status", is("PENDING")))
                 .andExpect(jsonPath("$.aiValidated", is(true)))
@@ -85,7 +90,7 @@ class IncidentApiTest {
                 .andExpect(jsonPath("$.longitude").value(lng))
                 .andExpect(jsonPath("$.aiResult.confidence", is(0.87)))
                 .andExpect(jsonPath("$.description", is("Bache frente al mercado")))
-                .andExpect(jsonPath("$.district", nullValue()))
+                .andExpect(jsonPath("$.district", is("Miraflores")))
                 .andExpect(jsonPath("$.history", hasSize(1)))
                 .andExpect(jsonPath("$.history[0].toStatus", is("PENDING")))
                 .andExpect(jsonPath("$.history[0].changedBy", is(citizen.toString())));
