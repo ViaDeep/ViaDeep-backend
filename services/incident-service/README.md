@@ -38,6 +38,7 @@ Ejemplo de registro validado por la IA (para un registro manual: `"aiValidated":
 
 - Tipos: `D00` grieta longitudinal, `D10` grieta transversal, `D20` piel de cocodrilo, `D40` bache.
 - Estados: `PENDING → IN_PROGRESS → RESOLVED` y `PENDING → REJECTED`; cada cambio queda en `status_histories`.
+- Descripción (opcional, hasta 500 caracteres): `DescriptionPolicy` rechaza con 422 las groserías e insultos (lista de palabras, también con tildes, mayúsculas, letras repetidas o números en lugar de letras), los enlaces, los correos y los números de teléfono. No entiende el sentido del texto: lo que pasa el filtro lo revisa el operador.
 - La evidencia debe existir, ser del ciudadano que reporta y no estar usada en otra incidencia (422 si no). Se verifica con `GET /evidences/{id}` reenviando el token; si el servicio de evidencias no responde, 503.
 - Asignación: queda registrado el operador que asignó (`assignedBy`) y cuándo (`assignedAt`); reasignar reemplaza al responsable anterior.
 - Posibles duplicados: incidencias abiertas del mismo tipo a menos de `INCIDENT_DUPLICATE_RADIUS_METERS` (30 m por defecto), con `ST_DWithin` de PostGIS.

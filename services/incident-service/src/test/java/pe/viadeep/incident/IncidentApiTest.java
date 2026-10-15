@@ -123,6 +123,17 @@ class IncidentApiTest {
     }
 
     @Test
+    void rejectsInappropriateDescriptions() throws Exception {
+        UUID evidence = ownedEvidence(citizen);
+        mvc.perform(post("/incidents").with(as(citizen, "CITIZEN")).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"evidenceId": "%s", "type": "D40", "latitude": %s, "longitude": %s,
+                         "description": "Arreglen esta mierda", "aiValidated": false}
+                        """.formatted(evidence, lat, lng)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail", is("La descripción contiene palabras inapropiadas. Describe solo el daño en la vía.")));
+    }
+
+    @Test
     void rejectsEvidenceThatIsMissingForeignOrAlreadyUsed() throws Exception {
         UUID foreign = UUID.randomUUID();
         when(evidenceGateway.find(eq(foreign), any())).thenReturn(Optional.of(new VerifiedEvidence(foreign, UUID.randomUUID())));
