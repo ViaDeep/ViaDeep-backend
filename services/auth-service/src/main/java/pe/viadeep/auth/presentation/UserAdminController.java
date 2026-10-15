@@ -6,6 +6,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +18,7 @@ import pe.viadeep.auth.application.UserFilter;
 import pe.viadeep.auth.domain.Role;
 import pe.viadeep.auth.presentation.AuthDtos.ChangeAdministratorRequest;
 import pe.viadeep.auth.presentation.AuthDtos.ChangeUserStatusRequest;
+import pe.viadeep.auth.presentation.AuthDtos.UpdateUserRequest;
 import pe.viadeep.auth.presentation.AuthDtos.UserResponse;
 
 /** Administración de usuarios desde la plataforma web. Todo menos ver un usuario es solo para administradores. */
@@ -43,6 +45,12 @@ class UserAdminController {
     @GetMapping("/{id}")
     UserResponse get(@PathVariable UUID id) {
         return UserResponse.from(manageUsers.get(id));
+    }
+
+    /** El administrador corrige el nombre y el celular de un usuario. */
+    @PutMapping("/{id}")
+    UserResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request) {
+        return UserResponse.from(manageUsers.updateBasicInfo(id, request.fullName(), request.phone()));
     }
 
     @PatchMapping("/{id}/status")
