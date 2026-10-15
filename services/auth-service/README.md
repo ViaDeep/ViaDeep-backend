@@ -18,6 +18,8 @@ Autenticación y usuarios: registro, inicio de sesión, perfiles, roles; emite J
 | PUT | `/auth/me/password` | Token | Cambia la contraseña con `currentPassword` y `newPassword`; 422 si la actual no coincide. |
 | GET | `/auth/users` | Administrador | Lista paginada de usuarios (`page`, `size` hasta 100), de la cuenta más reciente a la más antigua, con filtros `role` (`CITIZEN` u `OPERATOR`), `enabled` y `q` (nombre o correo, sin distinguir mayúsculas). |
 | GET | `/auth/users/{id}` | Operador | Datos de un usuario; 404 si no existe. |
+| PUT | `/auth/users/{id}` | Administrador | Corrige el nombre y el celular con `{"fullName": "...", "phone": "9XXXXXXXX"}` (celular opcional). El correo y el DNI no cambian. |
+| GET | `/auth/operators` | Operador | Operadores activos (`id`, `fullName`, `email`), para elegir al responsable de una incidencia. |
 | PATCH | `/auth/users/{id}/status` | Administrador | Activa o desactiva la cuenta con `{"enabled": true \| false}`. Nadie puede desactivar su propia cuenta (409). |
 | PATCH | `/auth/users/{id}/administrator` | Administrador | Da o quita el permiso de administrador con `{"administrator": true \| false}`. Solo a operadores activos (422); nadie puede quitarse el suyo (409). |
 | GET | `/auth/.well-known/jwks.json` | Público | Clave pública (JWKS) con la que los demás servicios validan los tokens. |

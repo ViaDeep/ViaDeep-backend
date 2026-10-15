@@ -143,6 +143,46 @@ class AuthFlowTest {
     }
 
     @Test
+    void anAdministratorCorrectsTheNameAndPhoneOfAnAccount() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        String citizenId = registerNamed("luis.mamani@correo.pe", "luis mamani");
+
+        updateUser(adminToken, citizenId, "Luis Mamani", "987654321").andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName", is("Luis Mamani")))
+                .andExpect(jsonPath("$.phone", is("987654321")))
+                .andExpect(jsonPath("$.email", is("luis.mamani@correo.pe")));
+        updateUser(adminToken, citizenId, "Luis Mamani", "12345").andExpect(status().isBadRequest());
+        updateUser(adminToken, citizenId, " ", "").andExpect(status().isBadRequest());
+        updateUser(adminToken, UUID.randomUUID().toString(), "Nadie", "").andExpect(status().isNotFound());
+
+        createOperator(adminToken, "elena@muni.pe", "Elena Ríos", "40000011").andExpect(status().isCreated());
+        String operatorToken = login("elena@muni.pe", "temporal1");
+        updateUser(operatorToken, citizenId, "Otro Nombre", "").andExpect(status().isForbidden());
+    }
+
+    @Test
+    void anyOperatorSeesTheActiveOperatorsToAssignIncidents() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        String disabledId = json.readTree(createOperator(adminToken, "baja@muni.pe", "Operador De Baja", "40000012")
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+        changeUserStatus(adminToken, disabledId, false).andExpect(status().isOk());
+        createOperator(adminToken, "pablo@muni.pe", "Pablo Vera", "40000013").andExpect(status().isCreated());
+        registerNamed("vecino.directorio@correo.pe", "Vecino Directorio");
+        String operatorToken = login("pablo@muni.pe", "temporal1");
+
+        String body = mvc.perform(get("/auth/operators").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(body).findValuesAsText("email"))
+                .contains("operador@muni.pe", "pablo@muni.pe")
+                .doesNotContain("baja@muni.pe", "vecino.directorio@correo.pe");
+
+        String citizenToken = login("vecino.directorio@correo.pe", "secreta123");
+        mvc.perform(get("/auth/operators").header("Authorization", "Bearer " + citizenToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void anAdministratorAppointsAndRemovesOtherAdministrators() throws Exception {
         String adminToken = login("operador@muni.pe", "operador123");
         String adminId = json.readTree(mvc.perform(get("/auth/me").header("Authorization", "Bearer " + adminToken))
@@ -400,6 +440,12 @@ class AuthFlowTest {
     private ResultActions changeAdministrator(String token, String id, boolean administrator) throws Exception {
         return mvc.perform(patch("/auth/users/" + id + "/administrator").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"administrator\": %s}".formatted(administrator)));
+    }
+
+    private ResultActions updateUser(String token, String id, String fullName, String phone) throws Exception {
+        return mvc.perform(put("/auth/users/" + id).header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"fullName": "%s", "phone": "%s"}""".formatted(fullName, phone)));
     }
 
     private ResultActions changeUserStatus(String token, String id, boolean enabled) throws Exception {

@@ -43,6 +43,19 @@ final class AuthDtos {
     record TokenResponse(String accessToken, String tokenType, long expiresIn, boolean passwordChangeRequired) {
     }
 
+    record UpdateUserRequest(
+            @NotBlank @Size(max = 120) String fullName,
+            @Pattern(regexp = "^$|^9\\d{8}$", message = "debe ser un celular de 9 dígitos que empiece con 9") String phone) {
+    }
+
+    /** Lo mínimo para elegir a un operador como responsable de una incidencia. */
+    record OperatorSummary(UUID id, String fullName, String email) {
+
+        static OperatorSummary from(User user) {
+            return new OperatorSummary(user.id(), user.fullName(), user.email());
+        }
+    }
+
     record ChangeUserStatusRequest(@NotNull Boolean enabled) {
     }
 

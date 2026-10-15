@@ -67,7 +67,7 @@ Para que solo personal de la municipalidad tenga cuenta de operador:
 
 La verificación por un enlace enviado al correo no está en el alcance de OB2 (no hay servicio de correo).
 
-El administrador gestiona las cuentas con `GET /auth/users` (filtros `role`, `enabled` y `q`) y `PATCH /auth/users/{id}/status`; cualquier operador puede leer `GET /auth/users/{id}` (por ejemplo, para ver quién hizo un reporte). `{"enabled": false}` desactiva una cuenta; nadie puede desactivar la suya. Una cuenta desactivada recibe 403 al iniciar sesión. Ver `services/auth-service/README.md`.
+El administrador gestiona las cuentas con `GET /auth/users` (filtros `role`, `enabled` y `q`), `PUT /auth/users/{id}` (corrige nombre y celular) y `PATCH /auth/users/{id}/status`; cualquier operador puede leer `GET /auth/users/{id}` (por ejemplo, para ver quién hizo un reporte) y `GET /auth/operators`, la lista de operadores activos para asignar incidencias. `{"enabled": false}` desactiva una cuenta; nadie puede desactivar la suya. Una cuenta desactivada recibe 403 al iniciar sesión. Ver `services/auth-service/README.md`.
 
 ## Notificaciones
 
