@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pe.viadeep.incident.application.EvidenceRejectedException;
 import pe.viadeep.incident.application.EvidenceServiceUnavailableException;
+import pe.viadeep.incident.domain.InappropriateDescriptionException;
 import pe.viadeep.incident.domain.IncidentClosedException;
 import pe.viadeep.incident.domain.IncidentNotFoundException;
 import pe.viadeep.incident.domain.InvalidIncidentException;
@@ -17,6 +18,11 @@ class ApiExceptionHandler {
     @ExceptionHandler(InvalidIncidentException.class)
     ProblemDetail invalid(InvalidIncidentException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(InappropriateDescriptionException.class)
+    ProblemDetail inappropriateDescription(InappropriateDescriptionException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
     }
 
     @ExceptionHandler(EvidenceRejectedException.class)
