@@ -7,24 +7,32 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Reglas para la descripción que escribe el ciudadano: debe hablar del daño en la vía, sin insultos ni groserías y sin
- * enlaces, correos ni números de teléfono. Es un filtro por lista de palabras: atrapa lo evidente (también con tildes,
- * mayúsculas, letras repetidas o números en lugar de letras), pero no entiende el sentido del texto; lo que pase el filtro
- * lo sigue revisando el operador.
+ * Reglas para la descripción que escribe el ciudadano: debe hablar del daño en la vía, sin insultos ni groserías (en
+ * español o inglés) y sin enlaces, correos ni números de teléfono. Es un filtro por lista de palabras: atrapa lo evidente
+ * (también con tildes, mayúsculas, letras repetidas o números en lugar de letras), pero no entiende el sentido del texto;
+ * lo que pase el filtro lo sigue revisando el operador.
  */
 public final class DescriptionPolicy {
 
-    /** Groserías e insultos comunes en Perú. Se comparan palabras completas ya normalizadas (sin tildes ni repeticiones). */
-    private static final Set<String> BLOCKED_WORDS = Set.of(
+    /**
+     * Groserías e insultos comunes en Perú y en inglés. Se comparan palabras completas ya normalizadas (sin tildes ni
+     * letras repetidas), así que cada entrada se escribe normalizada.
+     */
+    static final Set<String> BLOCKED_WORDS = Set.of(
             "mierda", "mierdas", "mrd", "carajo", "carajos", "puta", "putas", "puto", "putos", "putamadre", "ptm",
             "conchatumare", "conchatumadre", "conchasumare", "conchasumadre", "ctm", "csm", "chucha", "chuchatumare",
             "huevon", "huevona", "huevones", "huevonas", "webon", "webona", "webones", "weon", "cojudo", "cojuda",
             "cojudos", "cojudas", "cojudez", "cabron", "cabrona", "cabrones", "pendejo", "pendeja", "pendejos",
             "imbecil", "imbeciles", "idiota", "idiotas", "estupido", "estupida", "estupidos", "estupidas", "tarado",
             "tarada", "mongol", "mongolico", "mongolica", "retrasado", "retrasada", "maricon", "maricones", "marica",
-            "cabro", "cabros", "rosquete", "zorra", "zorras", "verga", "vergas", "pinga", "pingas",
+            "cabro", "cabros", "rosquete", "zora", "zoras", "verga", "vergas", "pinga", "pingas",
             "pichula", "cagada", "cagar", "cagon", "culo", "culos", "coño", "joder", "jodido", "jodida", "malparido",
-            "malparida", "gonorrea", "hijueputa", "hdp", "hdlgp", "chupala", "chupame", "lameculos");
+            "malparida", "gonorea", "hijueputa", "hdp", "hdlgp", "chupala", "chupame", "lameculos",
+            // Inglés. Van ya normalizadas: "asshole" se guarda como "ashole". "ass" no se incluye porque quedaría "as".
+            "fuck", "fucks", "fucked", "fucking", "fuckin", "fucker", "fuckers", "motherfucker", "fck", "fuk", "shit",
+            "shits", "shity", "bulshit", "bitch", "bitches", "ashole", "asholes", "dick", "dickhead", "cock", "pusy",
+            "cunt", "bastard", "slut", "whore", "fag", "fagot", "retard", "retarded", "dumbas", "jackas", "wtf",
+            "stfu", "idiot", "stupid", "moron");
 
     /** Enlaces, correos y teléfonos: no aportan a la descripción del daño y suelen ser publicidad o datos personales. */
     private static final Pattern LINK = Pattern.compile("(https?://|www\\.|\\b[\\w-]+\\.(com|pe|net|org)\\b)",

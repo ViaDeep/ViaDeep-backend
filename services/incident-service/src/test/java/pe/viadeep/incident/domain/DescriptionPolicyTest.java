@@ -29,6 +29,20 @@ class DescriptionPolicyTest {
     }
 
     @Test
+    void rejectsEnglishProfanityToo() {
+        assertThat(DescriptionPolicy.problem("fix this shit")).isPresent();
+        assertThat(DescriptionPolicy.problem("FUUUCK this road")).isPresent();
+        assertThat(DescriptionPolicy.problem("what an asshole")).isPresent();
+        assertThat(DescriptionPolicy.problem("as bad as it gets")).isEmpty();
+    }
+
+    @Test
+    void everyBlockedWordIsWrittenNormalized() {
+        assertThat(DescriptionPolicy.BLOCKED_WORDS).allSatisfy(
+                word -> assertThat(DescriptionPolicy.normalize(word)).isEqualTo(word));
+    }
+
+    @Test
     void rejectsLinksEmailsAndPhoneNumbers() {
         assertThat(DescriptionPolicy.problem("mira https://ejemplo.com")).hasValueSatisfying(
                 reason -> assertThat(reason).contains("enlaces"));
