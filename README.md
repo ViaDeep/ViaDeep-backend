@@ -48,6 +48,19 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 | `GEOCODING_ENABLED` | `true`: incidencias obtiene el distrito del GPS con Nominatim (OpenStreetMap) |
 | `GEOCODING_BASE_URL` / `GEOCODING_USER_AGENT` | `https://nominatim.openstreetmap.org` / `ViaDeep/0.1 (...)` |
 
+## Imágenes Docker
+
+Cada microservicio se empaqueta con el mismo `Dockerfile`, indicando cuál con `SERVICE`:
+
+```bash
+docker build --build-arg SERVICE=auth-service -t viadeep/auth-service .
+docker build --build-arg SERVICE=incident-service -t viadeep/incident-service .
+docker build --build-arg SERVICE=evidence-service -t viadeep/evidence-service .
+docker build --build-arg SERVICE=notification-service -t viadeep/notification-service .
+```
+
+La imagen compila el servicio con Maven y lo ejecuta con Java 21 como usuario sin privilegios. La configuración se pasa con las mismas variables de entorno de la sección anterior. La CI construye las cuatro imágenes en cada PR.
+
 ## Operadores municipales
 
 El registro público (`POST /auth/register`) solo crea ciudadanos. Hay dos tipos de cuenta municipal:
