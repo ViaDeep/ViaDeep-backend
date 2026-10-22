@@ -31,3 +31,13 @@ jobs:
           java-version: '21'
           cache: maven
       - run: mvn -B verify
+
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, incident-service, evidence-service, notification-service]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir la imagen de ${{ matrix.service }}
+        run: docker build --build-arg SERVICE=${{ matrix.service }} -t viadeep/${{ matrix.service }} .
