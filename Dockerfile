@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Imagen de un microservicio. Se construye desde la raíz del repositorio indicando cuál:
 #   docker build --build-arg SERVICE=auth-service -t viadeep/auth-service .
 # Servicios: auth-service, incident-service, evidence-service, notification-service.
@@ -11,9 +12,13 @@ COPY services/auth-service/pom.xml services/auth-service/
 COPY services/incident-service/pom.xml services/incident-service/
 COPY services/evidence-service/pom.xml services/evidence-service/
 COPY services/notification-service/pom.xml services/notification-service/
-RUN mvn -B -q -pl services/${SERVICE} -am dependency:go-offline
+# Las librerías descargadas se guardan en una caché de Docker compartida por los 4 servicios: se bajan una
+# sola vez (de a un servicio, con el candado) y, si la descarga se corta, el reintento sigue desde ahí.
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    mvn -B -q -pl services/${SERVICE} -am dependency:go-offline
 COPY services services
-RUN mvn -B -q -pl services/${SERVICE} -am package -DskipTests \
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    mvn -B -q -pl services/${SERVICE} -am package -DskipTests \
     && cp services/${SERVICE}/target/${SERVICE}-*.jar /app.jar
 
 FROM eclipse-temurin:21-jre
