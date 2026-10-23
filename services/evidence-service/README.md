@@ -20,4 +20,4 @@ Solo el ciudadano que subió la foto o un operador pueden consultarla (403 para 
 
 ## Almacenamiento
 
-Las fotos se guardan en el bucket `viadeep-evidences` con la clave `evidences/<usuario>/<id>.<ext>`; la base de datos solo guarda los metadatos. En local se usa un emulador de S3 (moto, incluido en el `docker-compose.yml`), y el servicio crea el bucket al arrancar si no existe. El emulador guarda las fotos en memoria: se pierden al reiniciar su contenedor. En AWS se dejan vacíos `S3_ENDPOINT`, `S3_ACCESS_KEY` y `S3_SECRET_KEY`, y el servicio usa el rol IAM de la tarea ECS.
+Las fotos se guardan en el bucket `viadeep-evidences` con la clave `evidences/<usuario>/<id>.<ext>`; la base de datos solo guarda los metadatos. En local se usa un emulador de S3 (S3Mock, incluido en el `docker-compose.yml`) que crea el bucket al arrancar y guarda las fotos en el volumen `viadeep-storage-data`, así que se conservan al reiniciar Docker. El servicio también crea el bucket si no existe. En AWS se dejan vacíos `S3_ENDPOINT`, `S3_ACCESS_KEY` y `S3_SECRET_KEY`, y el servicio usa el rol IAM de la tarea ECS.

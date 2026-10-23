@@ -24,13 +24,19 @@ services:
       timeout: 5s
       retries: 10
 
-  # Emulador local de Amazon S3 (moto). Guarda las fotos en memoria: se pierden al reiniciar el contenedor.
-  # El servicio de evidencias crea el bucket al arrancar si no existe.
+  # Emulador local de Amazon S3 (S3Mock). Guarda las fotos en un volumen, así que siguen ahí después de
+  # reiniciar Docker o la PC. Crea el bucket al arrancar.
   storage:
-    image: motoserver/moto:5.1.0
+    image: adobe/s3mock:5.2.3
     container_name: viadeep-storage
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: viadeep-evidences
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
     ports:
-      - "9000:5000"
+      - "9000:9090"
+    volumes:
+      - viadeep-storage-data:/s3mockroot
 
   auth:
     profiles: [app]
@@ -99,3 +105,4 @@ services:
 
 volumes:
   viadeep-db-data:
+  viadeep-storage-data:
