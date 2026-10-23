@@ -61,6 +61,24 @@ docker build --build-arg SERVICE=notification-service -t viadeep/notification-se
 
 La imagen compila el servicio con Maven y lo ejecuta con Java 21 como usuario sin privilegios. La configuración se pasa con las mismas variables de entorno de la sección anterior. La CI construye las cuatro imágenes en cada PR.
 
+### Los 4 microservicios con un solo comando
+
+Para levantar todo en Docker (base de datos, S3 local y los 4 servicios) sin Maven ni Java en la PC:
+
+```bash
+docker compose --profile app up -d --build
+```
+
+La primera vez tarda varios minutos porque compila las imágenes. Los servicios quedan en los mismos puertos (8081 a 8084), así que la web y la app móvil funcionan igual. Para que el celular pueda ver las fotos, crea un archivo `.env` junto a `docker-compose.yml` con la IP de la PC en el Wi-Fi (y, si quieres, la cuenta del administrador):
+
+```bash
+PC_IP=192.168.1.40
+OPERATOR_EMAIL=admin@munidemo.test
+OPERATOR_PASSWORD=una-clave-segura
+```
+
+Comandos útiles: `docker compose --profile app logs -f auth` (ver los mensajes de un servicio), `docker compose --profile app down` (apagar todo; los datos de la base se conservan). Sin `--profile app`, `docker compose up -d` sigue levantando solo la base y el S3 local.
+
 ## Operadores municipales
 
 El registro público (`POST /auth/register`) solo crea ciudadanos. Hay dos tipos de cuenta municipal:
