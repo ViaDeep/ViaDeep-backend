@@ -47,7 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Levantar la base, S3 y los 4 microservicios
-        run: docker compose --profile app up -d --build
+        run: |
+          # Las URLs de las fotos llevan la IP de la máquina, como la de la PC en el Wi-Fi.
+          echo "PC_IP=$(hostname -I | awk '{print $1}')" > .env
+          docker compose --profile app up -d --build
       - name: Esperar a que los 4 respondan
         run: |
           for port in 8081 8082 8083 8084; do
@@ -63,6 +66,19 @@ jobs:
             -d '{"email":"ciudadano@example.com","password":"ClaveSegura123","fullName":"Ciudadano CI"}'
           curl -fsS -X POST http://localhost:8081/auth/login -H 'Content-Type: application/json' \
             -d '{"email":"ciudadano@example.com","password":"ClaveSegura123"}' | grep -q token
+      - name: Subir una foto y leerla de nuevo después de reiniciar el almacenamiento
+        run: |
+          token=$(curl -fsS -X POST http://localhost:8081/auth/login -H 'Content-Type: application/json' \
+            -d '{"email":"ciudadano@example.com","password":"ClaveSegura123"}' | python3 -c 'import sys, json; print(json.load(sys.stdin)["accessToken"])')
+          printf '\xff\xd8\xff\xe0foto-de-prueba' > foto.jpg
+          id=$(curl -fsS -X POST http://localhost:8083/evidences -H "Authorization: Bearer $token" -F 'file=@foto.jpg;type=image/jpeg' \
+            | python3 -c 'import sys, json; print(json.load(sys.stdin)["id"])')
+          url() { curl -fsS "http://localhost:8083/evidences/$id/url" -H "Authorization: Bearer $token" | python3 -c 'import sys, json; print(json.load(sys.stdin)["url"])'; }
+          curl -fsS "$(url)" -o antes.jpg && cmp foto.jpg antes.jpg
+          docker compose restart storage
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://localhost:9000/ && break; sleep 2; done
+          curl -fsS "$(url)" -o despues.jpg && cmp foto.jpg despues.jpg
+          echo "La foto sigue disponible después de reiniciar el almacenamiento"
       - name: Logs si algo falló
         if: failure()
         run: docker compose --profile app logs --no-color --tail=200
