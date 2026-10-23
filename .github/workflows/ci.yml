@@ -31,3 +31,38 @@ jobs:
           java-version: '21'
           cache: maven
       - run: mvn -B verify
+
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, incident-service, evidence-service, notification-service]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir la imagen de ${{ matrix.service }}
+        run: docker build --build-arg SERVICE=${{ matrix.service }} -t viadeep/${{ matrix.service }} .
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Levantar la base, S3 y los 4 microservicios
+        run: docker compose --profile app up -d --build
+      - name: Esperar a que los 4 respondan
+        run: |
+          for port in 8081 8082 8083 8084; do
+            for i in $(seq 1 60); do
+              if curl -fsS "http://localhost:$port/actuator/health" | grep -q '"UP"'; then echo "$port UP"; break; fi
+              if [ "$i" = 60 ]; then echo "$port no responde"; exit 1; fi
+              sleep 3
+            done
+          done
+      - name: Registrar un ciudadano e iniciar sesión
+        run: |
+          curl -fsS -X POST http://localhost:8081/auth/register -H 'Content-Type: application/json' \
+            -d '{"email":"ciudadano@example.com","password":"ClaveSegura123","fullName":"Ciudadano CI"}'
+          curl -fsS -X POST http://localhost:8081/auth/login -H 'Content-Type: application/json' \
+            -d '{"email":"ciudadano@example.com","password":"ClaveSegura123"}' | grep -q token
+      - name: Logs si algo falló
+        if: failure()
+        run: docker compose --profile app logs --no-color --tail=200

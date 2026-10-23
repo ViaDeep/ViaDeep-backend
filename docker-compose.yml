@@ -1,6 +1,10 @@
 # Entorno local: PostgreSQL + PostGIS con un esquema por microservicio,
 # y un emulador local de Amazon S3 para las fotografías.
 # Uso: docker compose up -d
+#
+# Con el perfil "app" también se levantan los 4 microservicios en contenedores (sin Maven ni Java en la PC):
+#   docker compose --profile app up -d --build
+# Para que el celular vea las fotos, define PC_IP con la IP de la PC en el Wi-Fi (archivo .env junto a este).
 services:
   db:
     image: postgis/postgis:16-3.4
@@ -27,6 +31,71 @@ services:
     container_name: viadeep-storage
     ports:
       - "9000:5000"
+
+  auth:
+    profiles: [app]
+    build: { context: ., args: { SERVICE: auth-service } }
+    container_name: viadeep-auth
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      DB_HOST: db
+      DB_USER: auth_svc
+      DB_PASSWORD: auth_svc
+      OPERATOR_EMAIL: ${OPERATOR_EMAIL:-}
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
+      OPERATOR_NAME: ${OPERATOR_NAME:-Operador municipal}
+      OPERATOR_EMAIL_DOMAINS: ${OPERATOR_EMAIL_DOMAINS:-}
+      # Sin clave fija, cada reinicio de auth genera otra y hay que volver a iniciar sesión.
+      VIADEEP_JWT_PRIVATE_KEY: ${VIADEEP_JWT_PRIVATE_KEY:-}
+    ports:
+      - "8081:8081"
+
+  incidents:
+    profiles: [app]
+    build: { context: ., args: { SERVICE: incident-service } }
+    container_name: viadeep-incidents
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      DB_HOST: db
+      DB_USER: incidents_svc
+      DB_PASSWORD: incidents_svc
+      AUTH_JWKS_URI: http://auth:8081/auth/.well-known/jwks.json
+      EVIDENCE_SERVICE_URL: http://evidences:8083
+      NOTIFICATION_SERVICE_URL: http://notifications:8084
+    ports:
+      - "8082:8082"
+
+  evidences:
+    profiles: [app]
+    build: { context: ., args: { SERVICE: evidence-service } }
+    container_name: viadeep-evidences
+    depends_on:
+      db: { condition: service_healthy }
+      storage: { condition: service_started }
+    environment:
+      DB_HOST: db
+      DB_USER: evidences_svc
+      DB_PASSWORD: evidences_svc
+      AUTH_JWKS_URI: http://auth:8081/auth/.well-known/jwks.json
+      # Las URLs de las fotos llevan esta dirección, así que tiene que ser una que vean el navegador y el celular.
+      S3_ENDPOINT: http://${PC_IP:-host.docker.internal}:9000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8083:8083"
+
+  notifications:
+    profiles: [app]
+    build: { context: ., args: { SERVICE: notification-service } }
+    container_name: viadeep-notifications
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      DB_HOST: db
+      DB_USER: notifications_svc
+      DB_PASSWORD: notifications_svc
+      AUTH_JWKS_URI: http://auth:8081/auth/.well-known/jwks.json
+    ports:
+      - "8084:8084"
 
 volumes:
   viadeep-db-data:
