@@ -1,0 +1,37 @@
+server:
+  port: ${PORT:8084}
+
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:viadeep}?currentSchema=notifications
+    username: ${DB_USER:notifications_svc}
+    password: ${DB_PASSWORD:notifications_svc}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: notifications
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/auth/.well-known/jwks.json}
+  flyway:
+    schemas: notifications
+    default-schema: notifications
+
+viadeep:
+  internal-api:
+    # Clave compartida con el servicio de incidencias para POST /notifications. El valor por defecto es solo para
+    # desarrollo local; en AWS se define NOTIFICATIONS_INTERNAL_TOKEN con un secreto.
+    token: ${NOTIFICATIONS_INTERNAL_TOKEN:viadeep-dev-internal-token}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

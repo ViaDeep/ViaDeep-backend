@@ -1,0 +1,39 @@
+server:
+  port: ${PORT:8081}
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:viadeep}?currentSchema=auth
+    username: ${DB_USER:auth_svc}
+    password: ${DB_PASSWORD:auth_svc}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: auth
+  flyway:
+    schemas: auth
+    default-schema: auth
+
+viadeep:
+  jwt:
+    issuer: ${VIADEEP_JWT_ISSUER:viadeep-auth}
+    ttl: ${VIADEEP_JWT_TTL:1h}
+    key-id: ${VIADEEP_JWT_KEY_ID:viadeep-auth-1}
+    private-key: ${VIADEEP_JWT_PRIVATE_KEY:}
+  # Primer operador municipal, creado al iniciar si se configura y aún no existe. Los demás los crea un operador
+  # con POST /auth/operators.
+  initial-operator:
+    email: ${OPERATOR_EMAIL:}
+    password: ${OPERATOR_PASSWORD:}
+    full-name: ${OPERATOR_NAME:Operador municipal}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
