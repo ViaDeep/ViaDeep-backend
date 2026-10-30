@@ -1,5 +1,6 @@
 package pe.viadeep.auth.infrastructure.bootstrap;
 
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -7,12 +8,14 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import pe.viadeep.auth.application.RegisterUserUseCase;
+import pe.viadeep.auth.domain.Role;
 import pe.viadeep.auth.domain.User;
 import pe.viadeep.auth.domain.UserRepository;
 
 /**
- * Crea el primer operador al iniciar el servicio, para que alguien pueda entrar a la plataforma web y dar de alta
- * al resto. Si el correo ya existe no lo modifica.
+ * Crea el administrador al iniciar el servicio: el encargado que designa la municipalidad, que entra a la plataforma
+ * web y da de alta al resto de operadores. Si el correo ya existe como operador, solo se asegura de que sea el
+ * administrador (las bases creadas antes de existir ese rol lo tenían como operador común).
  */
 @Component
 @EnableConfigurationProperties(InitialOperatorProperties.class)
@@ -36,8 +39,18 @@ class InitialOperatorSeeder implements ApplicationRunner {
         if (!properties.configured()) {
             return;
         }
-        if (users.existsByEmail(User.normalizeEmail(properties.email()))) {
-            log.info("El operador inicial {} ya existe", properties.email());
+        Optional<User> existing = users.findByEmail(User.normalizeEmail(properties.email()));
+        if (existing.isPresent()) {
+            User user = existing.get();
+            if (user.role() == Role.OPERATOR && !user.administrator()) {
+                users.save(user.asAdministrator());
+                log.info("El operador {} ahora es el administrador", user.email());
+            } else if (user.role() != Role.OPERATOR) {
+                log.warn("OPERATOR_EMAIL {} pertenece a una cuenta de ciudadano; no se convierte en administrador",
+                        user.email());
+            } else {
+                log.info("El administrador {} ya existe", user.email());
+            }
             return;
         }
         if (properties.password().length() < MIN_PASSWORD_LENGTH) {
@@ -45,7 +58,7 @@ class InitialOperatorSeeder implements ApplicationRunner {
         }
         String fullName = properties.fullName() == null || properties.fullName().isBlank()
                 ? "Operador municipal" : properties.fullName();
-        User operator = registerUser.registerOperator(properties.email(), properties.password(), fullName);
-        log.info("Operador inicial creado: {}", operator.email());
+        User admin = registerUser.registerAdministrator(properties.email(), properties.password(), fullName);
+        log.info("Administrador creado: {}", admin.email());
     }
 }

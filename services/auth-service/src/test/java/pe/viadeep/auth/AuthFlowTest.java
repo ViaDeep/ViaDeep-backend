@@ -89,14 +89,17 @@ class AuthFlowTest {
     }
 
     @Test
-    void theInitialOperatorExistsAtStartupAndOnlyOperatorsCreateOperators() throws Exception {
+    void theAdministratorExistsAtStartupAndIsTheOnlyOneWhoCreatesOperators() throws Exception {
         String operatorToken = login("operador@muni.pe", "operador123");
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + operatorToken))
                 .andExpect(jsonPath("$.role", is("OPERATOR")))
+                .andExpect(jsonPath("$.administrator", is(true)))
                 .andExpect(jsonPath("$.fullName", is("Operadora de prueba")));
+        assertThat(SignedJWT.parse(operatorToken).getJWTClaimsSet().getBooleanClaim("admin")).isTrue();
 
         String newOperator = """
-                {"email": "Carla@Muni.pe", "password": "operadora1", "fullName": "Carla Huamán"}""";
+                {"email": "Carla@Muni.pe", "password": "operadora1", "fullName": "Carla Huamán",
+                 "documentNumber": "40000001"}""";
         mvc.perform(post("/auth/operators").contentType(MediaType.APPLICATION_JSON).content(newOperator))
                 .andExpect(status().isUnauthorized());
 
@@ -110,13 +113,164 @@ class AuthFlowTest {
                         .contentType(MediaType.APPLICATION_JSON).content(newOperator))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email", is("carla@muni.pe")))
-                .andExpect(jsonPath("$.role", is("OPERATOR")));
+                .andExpect(jsonPath("$.role", is("OPERATOR")))
+                .andExpect(jsonPath("$.documentNumber", is("40000001")))
+                .andExpect(jsonPath("$.administrator", is(false)));
         mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
                         .contentType(MediaType.APPLICATION_JSON).content(newOperator))
                 .andExpect(status().isConflict());
 
         SignedJWT jwt = SignedJWT.parse(login("carla@muni.pe", "operadora1"));
         assertThat(jwt.getJWTClaimsSet().getStringClaim("role")).isEqualTo("OPERATOR");
+        assertThat(jwt.getJWTClaimsSet().getBooleanClaim("admin")).isFalse();
+    }
+
+    @Test
+    void aRegularOperatorCannotCreateOrManageAccounts() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        createOperator(adminToken, "rosa@muni.pe", "Rosa Quispe", "40000002").andExpect(status().isCreated());
+        String operatorToken = login("rosa@muni.pe", "temporal1");
+        String citizenId = registerNamed("ana.ccori@correo.pe", "Ana Ccori");
+
+        createOperator(operatorToken, "rosa.otra@muni.pe", "Rosa Quispe", "40000099").andExpect(status().isForbidden());
+        mvc.perform(get("/auth/users").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isForbidden());
+        changeUserStatus(operatorToken, citizenId, false).andExpect(status().isForbidden());
+        // Sí puede ver los datos de quien hizo un reporte.
+        mvc.perform(get("/auth/users/" + citizenId).header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName", is("Ana Ccori")));
+    }
+
+    @Test
+    void anAdministratorCorrectsTheNameAndPhoneOfAnAccount() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        String citizenId = registerNamed("luis.mamani@correo.pe", "luis mamani");
+
+        updateUser(adminToken, citizenId, "Luis Mamani", "987654321").andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName", is("Luis Mamani")))
+                .andExpect(jsonPath("$.phone", is("987654321")))
+                .andExpect(jsonPath("$.email", is("luis.mamani@correo.pe")));
+        updateUser(adminToken, citizenId, "Luis Mamani", "12345").andExpect(status().isBadRequest());
+        updateUser(adminToken, citizenId, " ", "").andExpect(status().isBadRequest());
+        updateUser(adminToken, UUID.randomUUID().toString(), "Nadie", "").andExpect(status().isNotFound());
+
+        createOperator(adminToken, "elena@muni.pe", "Elena Ríos", "40000011").andExpect(status().isCreated());
+        String operatorToken = login("elena@muni.pe", "temporal1");
+        updateUser(operatorToken, citizenId, "Otro Nombre", "").andExpect(status().isForbidden());
+    }
+
+    @Test
+    void anyOperatorSeesTheActiveOperatorsToAssignIncidents() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        String disabledId = json.readTree(createOperator(adminToken, "baja@muni.pe", "Operador De Baja", "40000012")
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+        changeUserStatus(adminToken, disabledId, false).andExpect(status().isOk());
+        createOperator(adminToken, "pablo@muni.pe", "Pablo Vera", "40000013").andExpect(status().isCreated());
+        registerNamed("vecino.directorio@correo.pe", "Vecino Directorio");
+        String operatorToken = login("pablo@muni.pe", "temporal1");
+
+        String body = mvc.perform(get("/auth/operators").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(body).findValuesAsText("email"))
+                .contains("operador@muni.pe", "pablo@muni.pe")
+                .doesNotContain("baja@muni.pe", "vecino.directorio@correo.pe");
+
+        String citizenToken = login("vecino.directorio@correo.pe", "secreta123");
+        mvc.perform(get("/auth/operators").header("Authorization", "Bearer " + citizenToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void anAdministratorAppointsAndRemovesOtherAdministrators() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        String adminId = json.readTree(mvc.perform(get("/auth/me").header("Authorization", "Bearer " + adminToken))
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+        String marcoId = json.readTree(createOperator(adminToken, "marco@muni.pe", "Marco Salas", "40000006")
+                .andReturn().getResponse().getContentAsString()).get("id").asText();
+        String citizenId = registerNamed("vecina.admin@correo.pe", "Vecina");
+
+        changeAdministrator(adminToken, marcoId, true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.administrator", is(true)));
+        // Con el nuevo token, el segundo administrador ya puede gestionar cuentas, incluso quitarle el permiso al primero.
+        String marcoToken = login("marco@muni.pe", "temporal1");
+        assertThat(SignedJWT.parse(marcoToken).getJWTClaimsSet().getBooleanClaim("admin")).isTrue();
+        mvc.perform(get("/auth/users").header("Authorization", "Bearer " + marcoToken)).andExpect(status().isOk());
+
+        changeAdministrator(marcoToken, marcoId, false).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", is("No puedes quitarte tu propio permiso de administrador")));
+        changeAdministrator(adminToken, citizenId, true).andExpect(status().isUnprocessableEntity());
+
+        changeAdministrator(adminToken, marcoId, false).andExpect(status().isOk())
+                .andExpect(jsonPath("$.administrator", is(false)));
+        String demotedToken = login("marco@muni.pe", "temporal1");
+        changeAdministrator(demotedToken, adminId, false).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aPersonCanOnlyHaveOneOperatorAccount() throws Exception {
+        String adminToken = login("operador@muni.pe", "operador123");
+        createOperator(adminToken, "jose@muni.pe", "José Paredes", "40000003").andExpect(status().isCreated());
+
+        createOperator(adminToken, "jose.paredes@muni.pe", "José Paredes", "40000003")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail", is("Ya existe una cuenta de operador con el DNI 40000003")));
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"email": "sin.dni@muni.pe", "password": "temporal1", "fullName": "Sin DNI"}"""))
+                .andExpect(status().isBadRequest());
+
+        // El operador no puede cambiar su DNI desde su perfil.
+        String operatorToken = login("jose@muni.pe", "temporal1");
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"fullName": "José Paredes", "documentNumber": "40000004"}"""))
+                .andExpect(status().isUnprocessableEntity());
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"fullName": "José A. Paredes", "phone": "987654321", "documentNumber": "40000003"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName", is("José A. Paredes")));
+
+        // Un ciudadano puede tener el mismo DNI que un operador: es la misma persona usando la app.
+        register("jose.vecino@correo.pe");
+        String citizenToken = login("jose.vecino@correo.pe", "secreta123");
+        mvc.perform(put("/auth/me").header("Authorization", "Bearer " + citizenToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"fullName": "José Paredes", "documentNumber": "40000003"}"""))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void operatorsNeedAnInstitutionalEmailAndMustReplaceTheTemporaryPassword() throws Exception {
+        String operatorToken = login("operador@muni.pe", "operador123");
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"email": "luis@gmail.com", "password": "temporal1", "fullName": "Luis Rojas",
+                                 "documentNumber": "40000005"}"""))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail", is("Las cuentas de operador deben usar un correo institucional (@muni.pe)")));
+
+        mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"email": "luis@muni.pe", "password": "temporal1", "fullName": "Luis Rojas",
+                                 "documentNumber": "40000005"}"""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.passwordChangeRequired", is(true)));
+
+        String firstLogin = loginBody("luis@muni.pe", "temporal1");
+        assertThat(json.readTree(firstLogin).get("passwordChangeRequired").asBoolean()).isTrue();
+        String token = json.readTree(firstLogin).get("accessToken").asText();
+        mvc.perform(put("/auth/me/password").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"currentPassword": "temporal1", "newPassword": "mi-clave-propia"}"""))
+                .andExpect(status().isNoContent());
+
+        assertThat(json.readTree(loginBody("luis@muni.pe", "mi-clave-propia")).get("passwordChangeRequired").asBoolean())
+                .isFalse();
+        assertThat(json.readTree(loginBody("operador@muni.pe", "operador123")).get("passwordChangeRequired").asBoolean())
+                .isFalse();
     }
 
     @Test
@@ -276,18 +430,39 @@ class AuthFlowTest {
         return json.readTree(body).get("id").asText();
     }
 
+    private ResultActions createOperator(String token, String email, String fullName, String dni) throws Exception {
+        return mvc.perform(post("/auth/operators").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "%s", "password": "temporal1", "fullName": "%s", "documentNumber": "%s"}"""
+                        .formatted(email, fullName, dni)));
+    }
+
+    private ResultActions changeAdministrator(String token, String id, boolean administrator) throws Exception {
+        return mvc.perform(patch("/auth/users/" + id + "/administrator").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"administrator\": %s}".formatted(administrator)));
+    }
+
+    private ResultActions updateUser(String token, String id, String fullName, String phone) throws Exception {
+        return mvc.perform(put("/auth/users/" + id).header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"fullName": "%s", "phone": "%s"}""".formatted(fullName, phone)));
+    }
+
     private ResultActions changeUserStatus(String token, String id, boolean enabled) throws Exception {
         return mvc.perform(patch("/auth/users/" + id + "/status").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\": %s}".formatted(enabled)));
     }
 
     private String login(String email, String password) throws Exception {
-        String body = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+        JsonNode node = json.readTree(loginBody(email, password));
+        return node.get("accessToken").asText();
+    }
+
+    private String loginBody(String email, String password) throws Exception {
+        return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "%s", "password": "%s"}""".formatted(email, password)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType", is("Bearer")))
                 .andReturn().getResponse().getContentAsString();
-        JsonNode node = json.readTree(body);
-        return node.get("accessToken").asText();
     }
 }

@@ -1,5 +1,6 @@
 package pe.viadeep.auth.infrastructure.security;
 
+import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -7,6 +8,7 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.interfaces.RSAPrivateCrtKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -24,14 +26,24 @@ class RsaKeyConfig {
     private static final Logger log = LoggerFactory.getLogger(RsaKeyConfig.class);
 
     @Bean
-    RSAKey rsaKey(JwtProperties properties) throws NoSuchAlgorithmException, InvalidKeySpecException {
+    RSAKey rsaKey(JwtProperties properties) throws NoSuchAlgorithmException, InvalidKeySpecException, JOSEException {
         KeyPair keyPair = properties.privateKey() == null || properties.privateKey().isBlank()
                 ? generateTemporaryKeyPair()
                 : keyPairFromPem(properties.privateKey());
-        return new RSAKey.Builder((RSAPublicKey) keyPair.getPublic())
-                .privateKey(keyPair.getPrivate())
+        return withKeyId((RSAPublicKey) keyPair.getPublic(), keyPair.getPrivate(), properties.keyId());
+    }
+
+    /**
+     * El kid lleva una huella de la clave pública. Así, si la clave cambia (la temporal de desarrollo cambia en cada
+     * reinicio), los demás servicios ven un kid nuevo y vuelven a descargar el JWKS en ese momento, en vez de seguir
+     * validando con la clave anterior que tienen en caché y rechazar los tokens nuevos con 401.
+     */
+    static RSAKey withKeyId(RSAPublicKey publicKey, PrivateKey privateKey, String keyIdPrefix) throws JOSEException {
+        String thumbprint = new RSAKey.Builder(publicKey).build().computeThumbprint().toString();
+        return new RSAKey.Builder(publicKey)
+                .privateKey(privateKey)
                 .keyUse(KeyUse.SIGNATURE)
-                .keyID(properties.keyId())
+                .keyID(keyIdPrefix + "-" + thumbprint.substring(0, 8))
                 .build();
     }
 

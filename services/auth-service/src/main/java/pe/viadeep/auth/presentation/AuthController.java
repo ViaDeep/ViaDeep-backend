@@ -15,10 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 import pe.viadeep.auth.application.GetCurrentUserUseCase;
 import pe.viadeep.auth.application.LoginUseCase;
 import pe.viadeep.auth.application.RegisterUserUseCase;
-import pe.viadeep.auth.application.TokenIssuer;
 import pe.viadeep.auth.application.UpdateProfileUseCase;
 import pe.viadeep.auth.presentation.AuthDtos.ChangePasswordRequest;
 import pe.viadeep.auth.presentation.AuthDtos.LoginRequest;
+import pe.viadeep.auth.presentation.AuthDtos.NewOperatorRequest;
 import pe.viadeep.auth.presentation.AuthDtos.RegisterRequest;
 import pe.viadeep.auth.presentation.AuthDtos.TokenResponse;
 import pe.viadeep.auth.presentation.AuthDtos.UpdateProfileRequest;
@@ -47,17 +47,23 @@ class AuthController {
         return UserResponse.from(registerUser.register(request.email(), request.password(), request.fullName()));
     }
 
-    /** Solo un operador puede dar de alta a otro operador municipal. */
+    /**
+     * Solo el administrador da de alta operadores municipales, con un correo del dominio institucional y el DNI de la
+     * persona (una cuenta de operador por DNI). La contraseña es temporal: el nuevo operador debe cambiarla en su
+     * primer ingreso.
+     */
     @PostMapping("/operators")
     @ResponseStatus(HttpStatus.CREATED)
-    UserResponse registerOperator(@Valid @RequestBody RegisterRequest request) {
-        return UserResponse.from(registerUser.registerOperator(request.email(), request.password(), request.fullName()));
+    UserResponse registerOperator(@Valid @RequestBody NewOperatorRequest request) {
+        return UserResponse.from(registerUser.inviteOperator(request.email(), request.password(), request.fullName(),
+                request.documentNumber()));
     }
 
     @PostMapping("/login")
     TokenResponse login(@Valid @RequestBody LoginRequest request) {
-        TokenIssuer.IssuedToken token = login.login(request.email(), request.password());
-        return new TokenResponse(token.value(), "Bearer", token.expiresInSeconds());
+        LoginUseCase.Session session = login.login(request.email(), request.password());
+        return new TokenResponse(session.token().value(), "Bearer", session.token().expiresInSeconds(),
+                session.passwordChangeRequired());
     }
 
     @GetMapping("/me")

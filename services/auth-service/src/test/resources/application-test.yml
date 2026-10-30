@@ -9,3 +9,5 @@ viadeep:
     email: operador@muni.pe
     password: operador123
     full-name: Operadora de prueba
+  operators:
+    allowed-email-domains: muni.pe

@@ -49,6 +49,9 @@ public final class Incident {
     public static Incident register(UUID reporterId, UUID evidenceId, IncidentType type, GeoLocation location,
                                     String district, String description, AiDetection aiDetection, Instant now) {
         String cleanDescription = description == null || description.isBlank() ? null : description.strip();
+        DescriptionPolicy.problem(cleanDescription).ifPresent(problem -> {
+            throw new InappropriateDescriptionException(problem);
+        });
         UUID id = UUID.randomUUID();
         StatusChange initial = new StatusChange(UUID.randomUUID(), null, IncidentStatus.PENDING, reporterId, null, now);
         return new Incident(id, reporterId, evidenceId, type, location, district, cleanDescription,

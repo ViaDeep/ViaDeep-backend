@@ -20,6 +20,13 @@ final class AuthDtos {
             @NotBlank @Size(max = 120) String fullName) {
     }
 
+    record NewOperatorRequest(
+            @NotBlank @Email @Size(max = 254) String email,
+            @NotBlank @Size(min = 8, max = 72) String password,
+            @NotBlank @Size(max = 120) String fullName,
+            @NotBlank @Pattern(regexp = "^\\d{8}$", message = "debe tener 8 dígitos") String documentNumber) {
+    }
+
     record UpdateProfileRequest(
             @NotBlank @Size(max = 120) String fullName,
             @Pattern(regexp = "^$|^9\\d{8}$", message = "debe ser un celular de 9 dígitos que empiece con 9") String phone,
@@ -32,20 +39,38 @@ final class AuthDtos {
     record LoginRequest(@NotBlank String email, @NotBlank String password) {
     }
 
-    record TokenResponse(String accessToken, String tokenType, long expiresIn) {
+    /** passwordChangeRequired es true si la cuenta tiene una contraseña temporal que debe cambiarse ahora. */
+    record TokenResponse(String accessToken, String tokenType, long expiresIn, boolean passwordChangeRequired) {
+    }
+
+    record UpdateUserRequest(
+            @NotBlank @Size(max = 120) String fullName,
+            @Pattern(regexp = "^$|^9\\d{8}$", message = "debe ser un celular de 9 dígitos que empiece con 9") String phone) {
+    }
+
+    /** Lo mínimo para elegir a un operador como responsable de una incidencia. */
+    record OperatorSummary(UUID id, String fullName, String email) {
+
+        static OperatorSummary from(User user) {
+            return new OperatorSummary(user.id(), user.fullName(), user.email());
+        }
     }
 
     record ChangeUserStatusRequest(@NotNull Boolean enabled) {
     }
 
+    record ChangeAdministratorRequest(@NotNull Boolean administrator) {
+    }
+
     /** lastLoginAt es null si el usuario nunca inició sesión. */
     record UserResponse(UUID id, String email, String fullName, String role, String phone, String documentNumber,
-                        boolean enabled, Instant createdAt, Instant lastLoginAt) {
+                        boolean enabled, Instant createdAt, Instant lastLoginAt, boolean passwordChangeRequired,
+                        boolean administrator) {
 
         static UserResponse from(User user) {
             return new UserResponse(user.id(), user.email(), user.fullName(), user.role().name(),
                     user.phone().orElse(null), user.documentNumber().orElse(null), user.enabled(), user.createdAt(),
-                    user.lastLoginAt().orElse(null));
+                    user.lastLoginAt().orElse(null), user.passwordChangeRequired(), user.administrator());
         }
     }
 }
