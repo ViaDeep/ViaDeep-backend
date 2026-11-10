@@ -52,6 +52,9 @@ class UserJpaEntity {
     @Column(nullable = false)
     private boolean administrator;
 
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
     protected UserJpaEntity() {
     }
 
@@ -69,11 +72,12 @@ class UserJpaEntity {
         entity.lastLoginAt = user.lastLoginAt().orElse(null);
         entity.passwordChangeRequired = user.passwordChangeRequired();
         entity.administrator = user.administrator();
+        entity.emailVerified = user.emailVerified();
         return entity;
     }
 
     User toDomain() {
         return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
-                passwordChangeRequired, administrator);
+                passwordChangeRequired, administrator, emailVerified);
     }
 }

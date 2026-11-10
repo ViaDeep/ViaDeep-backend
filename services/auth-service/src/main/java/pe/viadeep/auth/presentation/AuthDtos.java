@@ -39,6 +39,20 @@ final class AuthDtos {
     record LoginRequest(@NotBlank String email, @NotBlank String password) {
     }
 
+    record EmailRequest(@NotBlank @Email @Size(max = 254) String email) {
+    }
+
+    record VerifyEmailRequest(
+            @NotBlank @Email @Size(max = 254) String email,
+            @NotBlank @Pattern(regexp = "^\\d{6}$", message = "debe tener 6 dígitos") String code) {
+    }
+
+    record ResetPasswordRequest(
+            @NotBlank @Email @Size(max = 254) String email,
+            @NotBlank @Pattern(regexp = "^\\d{6}$", message = "debe tener 6 dígitos") String code,
+            @NotBlank @Size(min = 8, max = 72) String newPassword) {
+    }
+
     /** passwordChangeRequired es true si la cuenta tiene una contraseña temporal que debe cambiarse ahora. */
     record TokenResponse(String accessToken, String tokenType, long expiresIn, boolean passwordChangeRequired) {
     }
@@ -62,15 +76,16 @@ final class AuthDtos {
     record ChangeAdministratorRequest(@NotNull Boolean administrator) {
     }
 
-    /** lastLoginAt es null si el usuario nunca inició sesión. */
+    /** lastLoginAt es null si el usuario nunca inició sesión. emailVerified es false mientras no confirme su correo. */
     record UserResponse(UUID id, String email, String fullName, String role, String phone, String documentNumber,
                         boolean enabled, Instant createdAt, Instant lastLoginAt, boolean passwordChangeRequired,
-                        boolean administrator) {
+                        boolean administrator, boolean emailVerified) {
 
         static UserResponse from(User user) {
             return new UserResponse(user.id(), user.email(), user.fullName(), user.role().name(),
                     user.phone().orElse(null), user.documentNumber().orElse(null), user.enabled(), user.createdAt(),
-                    user.lastLoginAt().orElse(null), user.passwordChangeRequired(), user.administrator());
+                    user.lastLoginAt().orElse(null), user.passwordChangeRequired(), user.administrator(),
+                    user.emailVerified());
         }
     }
 }

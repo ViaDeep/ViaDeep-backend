@@ -35,6 +35,19 @@ viadeep:
   # Vacío acepta cualquier correo: solo para desarrollo. En AWS debe configurarse.
   operators:
     allowed-email-domains: ${OPERATOR_EMAIL_DOMAINS:}
+  # Correo saliente (códigos de verificación y de cambio de contraseña). Con Gmail: MAIL_HOST=smtp.gmail.com, el
+  # correo en MAIL_USERNAME y una contraseña de aplicación en MAIL_PASSWORD. Sin MAIL_HOST los correos solo van al log.
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:}
+  # Códigos de 6 dígitos para confirmar el correo y restablecer la contraseña.
+  email-codes:
+    ttl: 15m
+    resend-cooldown: 60s
+    max-attempts: 5
 
 management:
   endpoints:

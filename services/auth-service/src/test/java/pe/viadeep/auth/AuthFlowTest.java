@@ -39,13 +39,18 @@ class AuthFlowTest {
     @Autowired
     private ObjectMapper json;
 
+    @Autowired
+    private RecordingEmailSender emails;
+
     @Test
     void registersLogsInAndReadsProfileWithTheIssuedToken() throws Exception {
         mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "Ana@Correo.pe", "password": "secreta123", "fullName": "Ana Quispe"}"""))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email", is("ana@correo.pe")))
-                .andExpect(jsonPath("$.role", is("CITIZEN")));
+                .andExpect(jsonPath("$.role", is("CITIZEN")))
+                .andExpect(jsonPath("$.emailVerified", is(false)));
+        verifyEmail("ana@correo.pe");
 
         String token = login("ana@correo.pe", "secreta123");
 
@@ -177,7 +182,7 @@ class AuthFlowTest {
                 .contains("operador@muni.pe", "pablo@muni.pe")
                 .doesNotContain("baja@muni.pe", "vecino.directorio@correo.pe");
 
-        String citizenToken = login("vecino.directorio@correo.pe", "secreta123");
+        String citizenToken = verifyEmail("vecino.directorio@correo.pe");
         mvc.perform(get("/auth/operators").header("Authorization", "Bearer " + citizenToken))
                 .andExpect(status().isForbidden());
     }
@@ -322,7 +327,7 @@ class AuthFlowTest {
         String operatorToken = login("operador@muni.pe", "operador123");
         String first = registerNamed("elsa.zevallos@correo.pe", "Elsa Zevallos");
         String second = registerNamed("zevallos.jorge@correo.pe", "Jorge Ramos");
-        login("elsa.zevallos@correo.pe", "secreta123");
+        verifyEmail("elsa.zevallos@correo.pe");
 
         // Busca en nombre o correo sin distinguir mayúsculas; las cuentas más recientes van primero.
         mvc.perform(get("/auth/users").param("q", "ZEVALLOS").header("Authorization", "Bearer " + operatorToken))
@@ -365,7 +370,7 @@ class AuthFlowTest {
     void operatorDisablesAndEnablesAccounts() throws Exception {
         String operatorToken = login("operador@muni.pe", "operador123");
         String id = registerNamed("tomas@correo.pe", "Tomás Vega");
-        String citizenToken = login("tomas@correo.pe", "secreta123");
+        String citizenToken = verifyEmail("tomas@correo.pe");
 
         changeUserStatus(operatorToken, id, false).andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(id)))
@@ -408,18 +413,87 @@ class AuthFlowTest {
     }
 
     @Test
+    void citizenMustConfirmTheEmailWithTheCodeBeforeLoggingIn() throws Exception {
+        mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "sofia@correo.pe", "password": "secreta123", "fullName": "Sofía Rojas"}"""))
+                .andExpect(status().isCreated());
+        assertThat(emails.sentTo("sofia@correo.pe")).hasSize(1);
+
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "sofia@correo.pe", "password": "secreta123"}"""))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("EMAIL_NOT_VERIFIED")));
+
+        String wrong = emails.lastCode("sofia@correo.pe").equals("000000") ? "111111" : "000000";
+        mvc.perform(post("/auth/email/verify").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "sofia@correo.pe", "code": "%s"}""".formatted(wrong)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail", is("El código no es correcto")));
+
+        // Reenviar enseguida no manda otro correo: hay un tiempo mínimo entre envíos.
+        mvc.perform(post("/auth/email/resend").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "sofia@correo.pe"}"""))
+                .andExpect(status().isTooManyRequests());
+
+        String token = verifyEmail("sofia@correo.pe");
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.emailVerified", is(true)));
+        login("sofia@correo.pe", "secreta123");
+    }
+
+    @Test
+    void forgottenPasswordIsReplacedWithTheCodeSentByEmail() throws Exception {
+        register("mario@correo.pe");
+
+        mvc.perform(post("/auth/password/forgot").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "nadie@correo.pe"}"""))
+                .andExpect(status().isNoContent());
+        assertThat(emails.sentTo("nadie@correo.pe")).isEmpty();
+
+        mvc.perform(post("/auth/password/forgot").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "Mario@Correo.pe"}"""))
+                .andExpect(status().isNoContent());
+        String code = emails.lastCode("mario@correo.pe");
+
+        mvc.perform(post("/auth/password/reset").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "mario@correo.pe", "code": "%s", "newPassword": "nuevaclave9"}""".formatted(code)))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "mario@correo.pe", "password": "secreta123"}"""))
+                .andExpect(status().isUnauthorized());
+        login("mario@correo.pe", "nuevaclave9");
+
+        // El código ya se usó: no sirve dos veces.
+        mvc.perform(post("/auth/password/reset").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "mario@correo.pe", "code": "%s", "newPassword": "otraclave99"}""".formatted(code)))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
     void rejectsInvalidRegistrationData() throws Exception {
         mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "no-es-correo", "password": "corta", "fullName": ""}"""))
                 .andExpect(status().isBadRequest());
     }
 
+    /** Registra al ciudadano y confirma su correo con el código que le llegó. */
     private void register(String email) throws Exception {
         mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "%s", "password": "secreta123", "fullName": "Usuario Prueba"}""".formatted(email)))
                 .andExpect(status().isCreated());
+        verifyEmail(email);
     }
 
+    private String verifyEmail(String email) throws Exception {
+        String body = mvc.perform(post("/auth/email/verify").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email": "%s", "code": "%s"}""".formatted(email, emails.lastCode(email))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(body).get("accessToken").asText();
+    }
+
+    /** Registra sin confirmar el correo, así la cuenta aún no tiene inicios de sesión. */
     private String registerNamed(String email, String fullName) throws Exception {
         String body = mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "%s", "password": "secreta123", "fullName": "%s"}""".formatted(email, fullName)))

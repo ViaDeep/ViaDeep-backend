@@ -51,6 +51,12 @@ services:
       OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
       OPERATOR_NAME: ${OPERATOR_NAME:-Operador municipal}
       OPERATOR_EMAIL_DOMAINS: ${OPERATOR_EMAIL_DOMAINS:-}
+      # Gmail para enviar los códigos de verificación y de cambio de contraseña. Sin MAIL_HOST van solo al log.
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       # Sin clave fija, cada reinicio de auth genera otra y hay que volver a iniciar sesión.
       VIADEEP_JWT_PRIVATE_KEY: ${VIADEEP_JWT_PRIVATE_KEY:-}
     ports:

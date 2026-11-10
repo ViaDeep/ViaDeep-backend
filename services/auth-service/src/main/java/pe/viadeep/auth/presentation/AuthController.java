@@ -12,17 +12,22 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import pe.viadeep.auth.application.EmailVerificationUseCase;
 import pe.viadeep.auth.application.GetCurrentUserUseCase;
 import pe.viadeep.auth.application.LoginUseCase;
+import pe.viadeep.auth.application.PasswordResetUseCase;
 import pe.viadeep.auth.application.RegisterUserUseCase;
 import pe.viadeep.auth.application.UpdateProfileUseCase;
 import pe.viadeep.auth.presentation.AuthDtos.ChangePasswordRequest;
+import pe.viadeep.auth.presentation.AuthDtos.EmailRequest;
 import pe.viadeep.auth.presentation.AuthDtos.LoginRequest;
 import pe.viadeep.auth.presentation.AuthDtos.NewOperatorRequest;
 import pe.viadeep.auth.presentation.AuthDtos.RegisterRequest;
+import pe.viadeep.auth.presentation.AuthDtos.ResetPasswordRequest;
 import pe.viadeep.auth.presentation.AuthDtos.TokenResponse;
 import pe.viadeep.auth.presentation.AuthDtos.UpdateProfileRequest;
 import pe.viadeep.auth.presentation.AuthDtos.UserResponse;
+import pe.viadeep.auth.presentation.AuthDtos.VerifyEmailRequest;
 
 @RestController
 @RequestMapping("/auth")
@@ -32,15 +37,21 @@ class AuthController {
     private final LoginUseCase login;
     private final GetCurrentUserUseCase getCurrentUser;
     private final UpdateProfileUseCase updateProfile;
+    private final EmailVerificationUseCase emailVerification;
+    private final PasswordResetUseCase passwordReset;
 
     AuthController(RegisterUserUseCase registerUser, LoginUseCase login, GetCurrentUserUseCase getCurrentUser,
-                   UpdateProfileUseCase updateProfile) {
+                   UpdateProfileUseCase updateProfile, EmailVerificationUseCase emailVerification,
+                   PasswordResetUseCase passwordReset) {
         this.registerUser = registerUser;
         this.login = login;
         this.getCurrentUser = getCurrentUser;
         this.updateProfile = updateProfile;
+        this.emailVerification = emailVerification;
+        this.passwordReset = passwordReset;
     }
 
+    /** Crea la cuenta pendiente y envía un código de 6 dígitos al correo. */
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     UserResponse register(@Valid @RequestBody RegisterRequest request) {
@@ -64,6 +75,33 @@ class AuthController {
         LoginUseCase.Session session = login.login(request.email(), request.password());
         return new TokenResponse(session.token().value(), "Bearer", session.token().expiresInSeconds(),
                 session.passwordChangeRequired());
+    }
+
+    /** Con el código correcto la cuenta queda verificada y se devuelve la sesión, como en el login. */
+    @PostMapping("/email/verify")
+    TokenResponse verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        LoginUseCase.Session session = emailVerification.verify(request.email(), request.code());
+        return new TokenResponse(session.token().value(), "Bearer", session.token().expiresInSeconds(),
+                session.passwordChangeRequired());
+    }
+
+    @PostMapping("/email/resend")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void resendVerification(@Valid @RequestBody EmailRequest request) {
+        emailVerification.resend(request.email());
+    }
+
+    /** Siempre 204, exista o no la cuenta, para no revelar qué correos están registrados. */
+    @PostMapping("/password/forgot")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void forgotPassword(@Valid @RequestBody EmailRequest request) {
+        passwordReset.requestReset(request.email());
+    }
+
+    @PostMapping("/password/reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordReset.reset(request.email(), request.code(), request.newPassword());
     }
 
     @GetMapping("/me")
