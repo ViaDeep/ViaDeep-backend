@@ -1,14 +1,20 @@
 package pe.viadeep.auth.presentation;
 
 import java.util.NoSuchElementException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import pe.viadeep.auth.application.AccountDisabledException;
 import pe.viadeep.auth.application.AdministratorNotAllowedException;
 import pe.viadeep.auth.application.CannotDisableOwnAccountException;
 import pe.viadeep.auth.application.CannotRemoveOwnAdministratorException;
+import pe.viadeep.auth.application.EmailCodeTooSoonException;
+import pe.viadeep.auth.application.EmailNotVerifiedException;
+import pe.viadeep.auth.application.InvalidEmailCodeException;
 import pe.viadeep.auth.application.InvalidCredentialsException;
 import pe.viadeep.auth.application.OperatorDocumentLockedException;
 import pe.viadeep.auth.application.OperatorEmailDomainNotAllowedException;
@@ -43,6 +49,35 @@ class ApiExceptionHandler {
     @ExceptionHandler(AccountDisabledException.class)
     ProblemDetail accountDisabled(AccountDisabledException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+    }
+
+    /** 403 con un código propio, para que la app abra la pantalla donde se escribe el código del correo. */
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    ProblemDetail emailNotVerified(EmailNotVerifiedException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+        problem.setProperty("code", "EMAIL_NOT_VERIFIED");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidEmailCodeException.class)
+    ProblemDetail invalidEmailCode(InvalidEmailCodeException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    @ExceptionHandler(EmailCodeTooSoonException.class)
+    ResponseEntity<ProblemDetail> emailCodeTooSoon(EmailCodeTooSoonException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+        problem.setProperty("retryAfterSeconds", e.retryAfterSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.retryAfterSeconds()))
+                .body(problem);
+    }
+
+    /** El servidor de correo no respondió: el registro o el pedido de código no se guarda y se puede reintentar. */
+    @ExceptionHandler(MailException.class)
+    ProblemDetail mailUnavailable(MailException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "No pudimos enviar el correo. Intenta de nuevo en unos minutos.");
     }
 
     @ExceptionHandler(CannotRemoveOwnAdministratorException.class)
