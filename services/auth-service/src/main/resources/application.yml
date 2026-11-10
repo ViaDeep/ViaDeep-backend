@@ -43,10 +43,6 @@ viadeep:
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
     from: ${MAIL_FROM:}
-  # Iniciar sesión con Google o con una cuenta personal de Microsoft. Vacío desactiva ese botón (responde 503).
-  social:
-    google-client-ids: ${GOOGLE_CLIENT_IDS:}
-    microsoft-client-id: ${MICROSOFT_CLIENT_ID:}
   # Códigos de 6 dígitos para confirmar el correo y restablecer la contraseña.
   email-codes:
     ttl: 15m

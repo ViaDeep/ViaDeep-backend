@@ -16,11 +16,8 @@ import pe.viadeep.auth.application.EmailCodeTooSoonException;
 import pe.viadeep.auth.application.EmailNotVerifiedException;
 import pe.viadeep.auth.application.InvalidEmailCodeException;
 import pe.viadeep.auth.application.InvalidCredentialsException;
-import pe.viadeep.auth.application.InvalidExternalTokenException;
 import pe.viadeep.auth.application.OperatorDocumentLockedException;
 import pe.viadeep.auth.application.OperatorEmailDomainNotAllowedException;
-import pe.viadeep.auth.application.SocialLoginNotAllowedException;
-import pe.viadeep.auth.application.SocialLoginUnavailableException;
 import pe.viadeep.auth.application.WrongPasswordException;
 import pe.viadeep.auth.domain.DocumentNumberAlreadyRegisteredException;
 import pe.viadeep.auth.domain.EmailAlreadyRegisteredException;
@@ -60,21 +57,6 @@ class ApiExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
         problem.setProperty("code", "EMAIL_NOT_VERIFIED");
         return problem;
-    }
-
-    @ExceptionHandler(InvalidExternalTokenException.class)
-    ProblemDetail invalidExternalToken(InvalidExternalTokenException e) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
-    }
-
-    @ExceptionHandler(SocialLoginNotAllowedException.class)
-    ProblemDetail socialLoginNotAllowed(SocialLoginNotAllowedException e) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
-    }
-
-    @ExceptionHandler(SocialLoginUnavailableException.class)
-    ProblemDetail socialLoginUnavailable(SocialLoginUnavailableException e) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
     }
 
     @ExceptionHandler(InvalidEmailCodeException.class)
