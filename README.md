@@ -42,6 +42,8 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 | `EVIDENCE_SERVICE_URL` | `http://localhost:8083` (lo usa incidencias para validar la evidencia) |
 | `AUTH_JWKS_URI` | `http://localhost:8081/auth/.well-known/jwks.json` |
 | `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` / `OPERATOR_NAME` | vacíos: no se crea operador. Si se definen, autenticación crea al iniciar el administrador (el encargado que designa la municipalidad; contraseña de 8 caracteres o más). Si ese correo ya existe como operador, lo convierte en administrador |
+| `MAIL_HOST` / `MAIL_PORT` | vacío / `587`: sin servidor de correo los códigos de verificación solo se escriben en el log de autenticación. Para enviarlos con Gmail: `smtp.gmail.com` |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` | Gmail del proyecto, su contraseña de aplicación de 16 letras (https://myaccount.google.com/apppasswords, requiere verificación en 2 pasos) y remitente opcional, por ejemplo `ViaDeep <viadeep.app@gmail.com>` |
 | `OPERATOR_EMAIL_DOMAINS` | vacío: acepta cualquier correo (solo desarrollo). Dominios institucionales permitidos para operadores, separados por comas, por ejemplo `munlima.gob.pe` |
 | `NOTIFICATION_SERVICE_URL` | `http://localhost:8084` (lo usa incidencias para pedir los avisos) |
 | `NOTIFICATIONS_INTERNAL_TOKEN` | `viadeep-dev-internal-token`: clave compartida entre incidencias y notificaciones para crear avisos. En AWS debe ser un secreto propio, igual en ambos servicios |
@@ -75,6 +77,10 @@ La primera vez tarda varios minutos porque compila las imágenes. Los servicios 
 PC_IP=192.168.1.40
 OPERATOR_EMAIL=admin@munidemo.test
 OPERATOR_PASSWORD=una-clave-segura
+# Opcional: Gmail para enviar los códigos de verificación y de cambio de contraseña
+MAIL_HOST=smtp.gmail.com
+MAIL_USERNAME=viadeep.app@gmail.com
+MAIL_PASSWORD=la-contraseña-de-aplicación
 ```
 
 Comandos útiles: `docker compose --profile app logs -f auth` (ver los mensajes de un servicio), `docker compose --profile app down` (apagar todo; los datos de la base se conservan). Sin `--profile app`, `docker compose up -d` sigue levantando solo la base y el S3 local.

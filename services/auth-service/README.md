@@ -10,8 +10,12 @@ Autenticación y usuarios: registro, inicio de sesión, perfiles, roles; emite J
 
 | Método | Ruta | Acceso | Descripción |
 |---|---|---|---|
-| POST | `/auth/register` | Público | Registra un ciudadano (`email`, `password` de 8 a 72 caracteres, `fullName`). Responde 201, o 409 si el correo ya existe. |
-| POST | `/auth/login` | Público | Devuelve `accessToken` (JWT RS256), `tokenType` y `expiresIn` en segundos. Responde 401 si las credenciales son incorrectas y 403 si la cuenta está desactivada. Registra la fecha del inicio de sesión. |
+| POST | `/auth/register` | Público | Registra un ciudadano (`email`, `password` de 8 a 72 caracteres, `fullName`) con `emailVerified: false` y envía un código de 6 dígitos a su correo. Responde 201, o 409 si el correo ya tiene una cuenta confirmada. Una cuenta pendiente con el mismo correo se reemplaza. |
+| POST | `/auth/email/verify` | Público | Confirma el correo con `email` y `code`. Devuelve la sesión, igual que el login. 422 si el código es incorrecto, venció (15 min) o se agotaron los 5 intentos. |
+| POST | `/auth/email/resend` | Público | Reenvía el código de verificación (`email`). Siempre 204; 429 si no pasó 1 minuto desde el envío anterior. |
+| POST | `/auth/password/forgot` | Público | Envía un código para restablecer la contraseña (`email`). Siempre 204, exista o no la cuenta; 429 si no pasó 1 minuto. |
+| POST | `/auth/password/reset` | Público | Cambia la contraseña con `email`, `code` y `newPassword`. 422 si el código no sirve. También confirma el correo y quita la contraseña temporal. |
+| POST | `/auth/login` | Público | Devuelve `accessToken` (JWT RS256), `tokenType` y `expiresIn` en segundos. Responde 401 si las credenciales son incorrectas, 403 si la cuenta está desactivada y 403 con `code: EMAIL_NOT_VERIFIED` si el ciudadano no confirmó su correo. Registra la fecha del inicio de sesión. |
 | POST | `/auth/operators` | Administrador | Da de alta un operador municipal: `email`, `password` (temporal), `fullName` y `documentNumber` (DNI de 8 dígitos). 409 si el correo o el DNI ya tienen cuenta de operador. |
 | GET | `/auth/me` | Token | Perfil del usuario autenticado, con `enabled`, `createdAt` y `lastLoginAt`. |
 | PUT | `/auth/me` | Token | Edita `fullName`, `phone` (celular de 9 dígitos) y `documentNumber` (DNI de 8 dígitos). Un operador no puede cambiar un DNI ya registrado (422) ni usar el de otro operador (409). |
