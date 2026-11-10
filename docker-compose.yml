@@ -57,6 +57,9 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      # Iniciar sesión con Google y con Outlook/Hotmail. Vacíos, esos botones de la app responden "no disponible".
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
       # Sin clave fija, cada reinicio de auth genera otra y hay que volver a iniciar sesión.
       VIADEEP_JWT_PRIVATE_KEY: ${VIADEEP_JWT_PRIVATE_KEY:-}
     ports:
