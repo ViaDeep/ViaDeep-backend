@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.viadeep.auth.domain.DocumentNumberAlreadyRegisteredException;
+import pe.viadeep.auth.domain.EmailCodePurpose;
 import pe.viadeep.auth.domain.EmailAlreadyRegisteredException;
 import pe.viadeep.auth.domain.Role;
 import pe.viadeep.auth.domain.User;
@@ -22,19 +23,39 @@ public class RegisterUserUseCase {
     private final UserRepository users;
     private final PasswordHasher passwordHasher;
     private final OperatorEmailPolicy operatorEmails;
+    private final EmailCodeService emailCodes;
     private final Clock clock;
 
     public RegisterUserUseCase(UserRepository users, PasswordHasher passwordHasher, OperatorEmailPolicy operatorEmails,
-                               Clock clock) {
+                               EmailCodeService emailCodes, Clock clock) {
         this.users = users;
         this.passwordHasher = passwordHasher;
         this.operatorEmails = operatorEmails;
+        this.emailCodes = emailCodes;
         this.clock = clock;
     }
 
+    /**
+     * Registro público de ciudadanos. La cuenta queda pendiente hasta que el ciudadano escriba el código que se envía a
+     * su correo. Si el correo ya se registró pero nunca se confirmó, se reemplaza esa cuenta pendiente: así nadie puede
+     * bloquear un correo ajeno registrándolo primero.
+     */
     @Transactional
     public User register(String email, String rawPassword, String fullName) {
-        return create(email, rawPassword, fullName, Role.CITIZEN);
+        String normalizedEmail = User.normalizeEmail(email);
+        User user = users.findByEmail(normalizedEmail)
+                .map(existing -> {
+                    if (existing.emailVerified()) {
+                        throw new EmailAlreadyRegisteredException(normalizedEmail);
+                    }
+                    return new User(existing.id(), normalizedEmail, passwordHasher.hash(rawPassword), fullName,
+                            Role.CITIZEN, existing.createdAt(), null, null, true, null, false, false, false);
+                })
+                .orElseGet(() -> User.signUp(normalizedEmail, passwordHasher.hash(rawPassword), fullName,
+                        clock.instant()));
+        User saved = users.save(user);
+        emailCodes.send(normalizedEmail, EmailCodePurpose.VERIFY_EMAIL);
+        return saved;
     }
 
     /**
@@ -63,13 +84,6 @@ public class RegisterUserUseCase {
         }
         return users.save(User.inviteOperator(normalizedEmail, passwordHasher.hash(temporaryPassword), fullName, dni,
                 clock.instant()));
-    }
-
-    private User create(String email, String rawPassword, String fullName, Role role) {
-        String normalizedEmail = User.normalizeEmail(email);
-        ensureAvailable(normalizedEmail);
-        User user = User.register(normalizedEmail, passwordHasher.hash(rawPassword), fullName, role, clock.instant());
-        return users.save(user);
     }
 
     private void ensureAvailable(String normalizedEmail) {

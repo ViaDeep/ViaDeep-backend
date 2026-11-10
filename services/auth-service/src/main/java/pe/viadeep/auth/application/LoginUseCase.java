@@ -33,6 +33,9 @@ public class LoginUseCase {
         if (!user.enabled()) {
             throw new AccountDisabledException();
         }
+        if (!user.emailVerified()) {
+            throw new EmailNotVerifiedException();
+        }
         User saved = users.save(user.withLastLoginAt(clock.instant()));
         return new Session(tokenIssuer.issue(saved), saved.passwordChangeRequired());
     }
