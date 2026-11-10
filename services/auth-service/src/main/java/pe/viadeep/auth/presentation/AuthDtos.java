@@ -54,6 +54,10 @@ final class AuthDtos {
     }
 
     /** passwordChangeRequired es true si la cuenta tiene una contraseña temporal que debe cambiarse ahora. */
+    /** Token de identidad (id_token) que la app recibió de Google o Microsoft. */
+    record SocialLoginRequest(@NotBlank @Size(max = 8192) String idToken) {
+    }
+
     record TokenResponse(String accessToken, String tokenType, long expiresIn, boolean passwordChangeRequired) {
     }
 

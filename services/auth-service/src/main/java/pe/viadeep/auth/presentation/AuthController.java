@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pe.viadeep.auth.application.EmailVerificationUseCase;
 import pe.viadeep.auth.application.GetCurrentUserUseCase;
+import pe.viadeep.auth.application.IdentityProvider;
 import pe.viadeep.auth.application.LoginUseCase;
 import pe.viadeep.auth.application.PasswordResetUseCase;
 import pe.viadeep.auth.application.RegisterUserUseCase;
+import pe.viadeep.auth.application.SocialLoginUseCase;
 import pe.viadeep.auth.application.UpdateProfileUseCase;
 import pe.viadeep.auth.presentation.AuthDtos.ChangePasswordRequest;
 import pe.viadeep.auth.presentation.AuthDtos.EmailRequest;
@@ -24,6 +26,7 @@ import pe.viadeep.auth.presentation.AuthDtos.LoginRequest;
 import pe.viadeep.auth.presentation.AuthDtos.NewOperatorRequest;
 import pe.viadeep.auth.presentation.AuthDtos.RegisterRequest;
 import pe.viadeep.auth.presentation.AuthDtos.ResetPasswordRequest;
+import pe.viadeep.auth.presentation.AuthDtos.SocialLoginRequest;
 import pe.viadeep.auth.presentation.AuthDtos.TokenResponse;
 import pe.viadeep.auth.presentation.AuthDtos.UpdateProfileRequest;
 import pe.viadeep.auth.presentation.AuthDtos.UserResponse;
@@ -39,16 +42,18 @@ class AuthController {
     private final UpdateProfileUseCase updateProfile;
     private final EmailVerificationUseCase emailVerification;
     private final PasswordResetUseCase passwordReset;
+    private final SocialLoginUseCase socialLogin;
 
     AuthController(RegisterUserUseCase registerUser, LoginUseCase login, GetCurrentUserUseCase getCurrentUser,
                    UpdateProfileUseCase updateProfile, EmailVerificationUseCase emailVerification,
-                   PasswordResetUseCase passwordReset) {
+                   PasswordResetUseCase passwordReset, SocialLoginUseCase socialLogin) {
         this.registerUser = registerUser;
         this.login = login;
         this.getCurrentUser = getCurrentUser;
         this.updateProfile = updateProfile;
         this.emailVerification = emailVerification;
         this.passwordReset = passwordReset;
+        this.socialLogin = socialLogin;
     }
 
     /** Crea la cuenta pendiente y envía un código de 6 dígitos al correo. */
@@ -75,6 +80,18 @@ class AuthController {
         LoginUseCase.Session session = login.login(request.email(), request.password());
         return new TokenResponse(session.token().value(), "Bearer", session.token().expiresInSeconds(),
                 session.passwordChangeRequired());
+    }
+
+    /** Entra (o crea la cuenta de ciudadano) con el token de identidad de Google. */
+    @PostMapping("/google")
+    TokenResponse google(@Valid @RequestBody SocialLoginRequest request) {
+        return toResponse(socialLogin.login(IdentityProvider.GOOGLE, request.idToken()));
+    }
+
+    /** Igual que Google, con una cuenta personal de Microsoft (Outlook, Hotmail o Live). */
+    @PostMapping("/microsoft")
+    TokenResponse microsoft(@Valid @RequestBody SocialLoginRequest request) {
+        return toResponse(socialLogin.login(IdentityProvider.MICROSOFT, request.idToken()));
     }
 
     /** Con el código correcto la cuenta queda verificada y se devuelve la sesión, como en el login. */
@@ -119,5 +136,10 @@ class AuthController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void changePassword(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ChangePasswordRequest request) {
         updateProfile.changePassword(UUID.fromString(jwt.getSubject()), request.currentPassword(), request.newPassword());
+    }
+
+    private static TokenResponse toResponse(LoginUseCase.Session session) {
+        return new TokenResponse(session.token().value(), "Bearer", session.token().expiresInSeconds(),
+                session.passwordChangeRequired());
     }
 }
