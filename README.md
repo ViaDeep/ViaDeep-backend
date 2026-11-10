@@ -44,6 +44,8 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 | `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` / `OPERATOR_NAME` | vacíos: no se crea operador. Si se definen, autenticación crea al iniciar el administrador (el encargado que designa la municipalidad; contraseña de 8 caracteres o más). Si ese correo ya existe como operador, lo convierte en administrador |
 | `MAIL_HOST` / `MAIL_PORT` | vacío / `587`: sin servidor de correo los códigos de verificación solo se escriben en el log de autenticación. Para enviarlos con Gmail: `smtp.gmail.com` |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` | Gmail del proyecto, su contraseña de aplicación de 16 letras (https://myaccount.google.com/apppasswords, requiere verificación en 2 pasos) y remitente opcional, por ejemplo `ViaDeep <viadeep.app@gmail.com>` |
+| `GOOGLE_CLIENT_IDS` | vacío: el botón de Google responde "no disponible". ID de cliente OAuth de tipo "Aplicación web" creado en Google Cloud (el mismo que usa la app en `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`) |
+| `MICROSOFT_CLIENT_ID` | vacío: el botón de Outlook responde "no disponible". ID de aplicación (cliente) registrado en Microsoft Entra para cuentas personales (el mismo de `EXPO_PUBLIC_MICROSOFT_CLIENT_ID` en la app) |
 | `OPERATOR_EMAIL_DOMAINS` | vacío: acepta cualquier correo (solo desarrollo). Dominios institucionales permitidos para operadores, separados por comas, por ejemplo `munlima.gob.pe` |
 | `NOTIFICATION_SERVICE_URL` | `http://localhost:8084` (lo usa incidencias para pedir los avisos) |
 | `NOTIFICATIONS_INTERNAL_TOKEN` | `viadeep-dev-internal-token`: clave compartida entre incidencias y notificaciones para crear avisos. En AWS debe ser un secreto propio, igual en ambos servicios |
@@ -81,6 +83,9 @@ OPERATOR_PASSWORD=una-clave-segura
 MAIL_HOST=smtp.gmail.com
 MAIL_USERNAME=viadeep.app@gmail.com
 MAIL_PASSWORD=la-contraseña-de-aplicación
+# Opcional: iniciar sesión con Google y Outlook
+GOOGLE_CLIENT_IDS=123-abc.apps.googleusercontent.com
+MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000
 ```
 
 Comandos útiles: `docker compose --profile app logs -f auth` (ver los mensajes de un servicio), `docker compose --profile app down` (apagar todo; los datos de la base se conservan). Sin `--profile app`, `docker compose up -d` sigue levantando solo la base y el S3 local.
