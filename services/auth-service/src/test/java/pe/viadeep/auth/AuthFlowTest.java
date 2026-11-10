@@ -27,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import pe.viadeep.auth.application.IdentityProvider;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -471,6 +472,52 @@ class AuthFlowTest {
     }
 
     @Test
+    void citizenSignsInWithGoogleOrMicrosoftWithoutAnEmailCode() throws Exception {
+        String token = socialLogin("google", FakeIdentityVerifier.token(IdentityProvider.GOOGLE, "Rosa@Gmail.com",
+                "Rosa Flores"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String accessToken = json.readTree(token).get("accessToken").asText();
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(jsonPath("$.email", is("rosa@gmail.com")))
+                .andExpect(jsonPath("$.fullName", is("Rosa Flores")))
+                .andExpect(jsonPath("$.role", is("CITIZEN")))
+                .andExpect(jsonPath("$.emailVerified", is(true)));
+        assertThat(emails.sentTo("rosa@gmail.com")).isEmpty();
+
+        // La segunda vez entra a la misma cuenta.
+        String again = json.readTree(socialLogin("google", FakeIdentityVerifier.token(IdentityProvider.GOOGLE,
+                "rosa@gmail.com", "Otro nombre")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("accessToken").asText();
+        assertThat(SignedJWT.parse(again).getJWTClaimsSet().getSubject())
+                .isEqualTo(SignedJWT.parse(accessToken).getJWTClaimsSet().getSubject());
+
+        // Quien se registró con contraseña y no escribió el código queda verificado al entrar con Outlook.
+        registerNamed("mario@outlook.com", "Mario Rojas");
+        socialLogin("microsoft", FakeIdentityVerifier.token(IdentityProvider.MICROSOFT, "mario@outlook.com", ""))
+                .andExpect(status().isOk());
+        login("mario@outlook.com", "secreta123");
+
+        // Un token de Google no sirve como de Microsoft, ni uno inválido.
+        socialLogin("microsoft", FakeIdentityVerifier.token(IdentityProvider.GOOGLE, "rosa@gmail.com", "Rosa"))
+                .andExpect(status().isUnauthorized());
+        socialLogin("google", "token-falso").andExpect(status().isUnauthorized());
+        socialLogin("google", "").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void operatorsCannotSignInWithGoogleAndDisabledCitizensStayOut() throws Exception {
+        socialLogin("google", FakeIdentityVerifier.token(IdentityProvider.GOOGLE, "operador@muni.pe", "Operadora"))
+                .andExpect(status().isForbidden());
+
+        String citizenId = registerNamed("bloqueada@gmail.com", "Bloqueada");
+        String adminToken = login("operador@muni.pe", "operador123");
+        changeUserStatus(adminToken, citizenId, false).andExpect(status().isOk());
+        socialLogin("google", FakeIdentityVerifier.token(IdentityProvider.GOOGLE, "bloqueada@gmail.com", "Bloqueada"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void rejectsInvalidRegistrationData() throws Exception {
         mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email": "no-es-correo", "password": "corta", "fullName": ""}"""))
@@ -525,6 +572,11 @@ class AuthFlowTest {
     private ResultActions changeUserStatus(String token, String id, boolean enabled) throws Exception {
         return mvc.perform(patch("/auth/users/" + id + "/status").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\": %s}".formatted(enabled)));
+    }
+
+    private ResultActions socialLogin(String provider, String idToken) throws Exception {
+        return mvc.perform(post("/auth/" + provider).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("idToken", idToken))));
     }
 
     private String login(String email, String password) throws Exception {
