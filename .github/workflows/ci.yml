@@ -60,10 +60,16 @@ jobs:
               sleep 3
             done
           done
-      - name: Registrar un ciudadano e iniciar sesión
+      - name: Registrar un ciudadano, confirmar el correo e iniciar sesión
         run: |
           curl -fsS -X POST http://localhost:8081/auth/register -H 'Content-Type: application/json' \
             -d '{"email":"ciudadano@example.com","password":"ClaveSegura123","fullName":"Ciudadano CI"}'
+          # Sin MAIL_HOST el correo con el código solo se escribe en el log de autenticación.
+          code=$(docker compose --profile app logs --no-color --no-log-prefix auth \
+            | grep -A5 'Correo para ciudadano@example.com' | grep -oE 'es: [0-9]{6}' | tail -1 | cut -d' ' -f2)
+          test -n "$code"
+          curl -fsS -X POST http://localhost:8081/auth/email/verify -H 'Content-Type: application/json' \
+            -d "{\"email\":\"ciudadano@example.com\",\"code\":\"$code\"}" | grep -q accessToken
           curl -fsS -X POST http://localhost:8081/auth/login -H 'Content-Type: application/json' \
             -d '{"email":"ciudadano@example.com","password":"ClaveSegura123"}' | grep -q token
       - name: Subir una foto y leerla de nuevo después de reiniciar el almacenamiento
