@@ -20,10 +20,11 @@ public final class User {
     private final Instant lastLoginAt;
     private final boolean passwordChangeRequired;
     private final boolean administrator;
+    private final boolean emailVerified;
 
     public User(UUID id, String email, String passwordHash, String fullName, Role role, Instant createdAt,
                 String phone, String documentNumber, boolean enabled, Instant lastLoginAt,
-                boolean passwordChangeRequired, boolean administrator) {
+                boolean passwordChangeRequired, boolean administrator, boolean emailVerified) {
         this.id = Objects.requireNonNull(id);
         this.email = normalizeEmail(email);
         this.passwordHash = Objects.requireNonNull(passwordHash);
@@ -36,6 +37,7 @@ public final class User {
         this.lastLoginAt = lastLoginAt;
         this.passwordChangeRequired = passwordChangeRequired;
         this.administrator = administrator;
+        this.emailVerified = emailVerified;
         if (administrator && role != Role.OPERATOR) {
             throw new IllegalArgumentException("Solo un operador puede ser administrador");
         }
@@ -43,7 +45,17 @@ public final class User {
 
     /** Las cuentas nuevas nacen activas y sin inicios de sesión. */
     public static User register(String email, String passwordHash, String fullName, Role role, Instant now) {
-        return new User(UUID.randomUUID(), email, passwordHash, fullName, role, now, null, null, true, null, false, false);
+        return new User(UUID.randomUUID(), email, passwordHash, fullName, role, now, null, null, true, null, false, false,
+                true);
+    }
+
+    /**
+     * Ciudadano que se registra desde la app: no puede iniciar sesión hasta escribir el código que le llega al correo,
+     * así se comprueba que el correo existe y es suyo.
+     */
+    public static User signUp(String email, String passwordHash, String fullName, Instant now) {
+        return new User(UUID.randomUUID(), email, passwordHash, fullName, Role.CITIZEN, now, null, null, true, null, false,
+                false, false);
     }
 
     /**
@@ -53,30 +65,30 @@ public final class User {
     public static User inviteOperator(String email, String temporaryPasswordHash, String fullName,
                                       String documentNumber, Instant now) {
         return new User(UUID.randomUUID(), email, temporaryPasswordHash, fullName, Role.OPERATOR, now, null,
-                Objects.requireNonNull(documentNumber), true, null, true, false);
+                Objects.requireNonNull(documentNumber), true, null, true, false, true);
     }
 
     /** Datos que el propio usuario puede editar. El correo y el rol no cambian. */
     public User withProfile(String fullName, String phone, String documentNumber) {
         return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
-                passwordChangeRequired, administrator);
+                passwordChangeRequired, administrator, emailVerified);
     }
 
     /** Al elegir su propia contraseña deja de tener una temporal. */
     public User withPasswordHash(String passwordHash) {
         return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
-                false, administrator);
+                false, administrator, emailVerified);
     }
 
     /** Un operador activa o desactiva la cuenta; una cuenta desactivada no puede iniciar sesión. */
     public User withEnabled(boolean enabled) {
         return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
-                passwordChangeRequired, administrator);
+                passwordChangeRequired, administrator, emailVerified);
     }
 
     public User withLastLoginAt(Instant lastLoginAt) {
         return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
-                passwordChangeRequired, administrator);
+                passwordChangeRequired, administrator, emailVerified);
     }
 
     /** Los administradores (los encargados que designa la municipalidad) son los únicos que gestionan las cuentas. */
@@ -86,7 +98,13 @@ public final class User {
 
     public User withAdministrator(boolean administrator) {
         return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
-                passwordChangeRequired, administrator);
+                passwordChangeRequired, administrator, emailVerified);
+    }
+
+    /** El usuario escribió el código que se envió a su correo. */
+    public User withEmailVerified() {
+        return new User(id, email, passwordHash, fullName, role, createdAt, phone, documentNumber, enabled, lastLoginAt,
+                passwordChangeRequired, administrator, true);
     }
 
     private static String blankToNull(String value) {
@@ -141,6 +159,11 @@ public final class User {
 
     public boolean administrator() {
         return administrator;
+    }
+
+    /** false mientras un ciudadano recién registrado no confirme su correo con el código. */
+    public boolean emailVerified() {
+        return emailVerified;
     }
 
     /** Último inicio de sesión exitoso; vacío si nunca inició sesión. */
