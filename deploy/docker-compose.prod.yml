@@ -1,0 +1,78 @@
+# Servidor de la demo (una máquina virtual con Docker, por ejemplo en Azure for Students).
+# Se usa junto con el docker-compose.yml de la raíz, desde la raíz del repositorio:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml --profile app up -d --build
+# El repositorio ViaDeep-webplatform debe estar clonado al lado de este (../ViaDeep-webplatform).
+#
+# Cambios respecto de la PC de desarrollo:
+# - Solo la web queda expuesta (puertos 80 y 443, y 9443 para las fotos), con https automático de Let's Encrypt.
+#   La base, el almacenamiento y los 4 servicios ya no publican puertos: se llega a ellos a través de la web.
+# - Las fotos se guardan por la red interna de Docker y se descargan por https://DOMAIN:9443.
+# - Límites de memoria para que todo entre en una máquina de 4 GB, y reinicio automático si la máquina se reinicia.
+# Los valores salen del archivo .env de la raíz (ver deploy/.env.example).
+
+services:
+  db:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+
+  storage:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 384m
+
+  auth:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      # En el servidor la clave es obligatoria: si cambiara en cada reinicio, todos tendrían que volver a entrar.
+      VIADEEP_JWT_PRIVATE_KEY: ${VIADEEP_JWT_PRIVATE_KEY:?Falta VIADEEP_JWT_PRIVATE_KEY en .env}
+
+  incidents:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      NOTIFICATIONS_INTERNAL_TOKEN: ${NOTIFICATIONS_INTERNAL_TOKEN:?Falta NOTIFICATIONS_INTERNAL_TOKEN en .env}
+
+  evidences:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      S3_ENDPOINT: http://storage:9090
+      S3_PUBLIC_ENDPOINT: https://${DOMAIN:?Falta DOMAIN en .env}:9443
+
+  notifications:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      NOTIFICATIONS_INTERNAL_TOKEN: ${NOTIFICATIONS_INTERNAL_TOKEN:?Falta NOTIFICATIONS_INTERNAL_TOKEN en .env}
+
+  # La plataforma web compilada, servida por Caddy, que además reparte /auth, /incidents, /evidences y
+  # /notifications a cada microservicio y obtiene el certificado https.
+  web:
+    profiles: [app]
+    build:
+      context: ../ViaDeep-webplatform
+      args:
+        VITE_CARTO_API_KEY: ${VITE_CARTO_API_KEY:-}
+    container_name: viadeep-web
+    depends_on: [auth, incidents, evidences, notifications]
+    environment:
+      DOMAIN: ${DOMAIN:?Falta DOMAIN en .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "9443:9443"
+    volumes:
+      - viadeep-caddy-data:/data
+      - viadeep-caddy-config:/config
+    restart: unless-stopped
+    mem_limit: 128m
+
+volumes:
+  viadeep-caddy-data:
+  viadeep-caddy-config:
