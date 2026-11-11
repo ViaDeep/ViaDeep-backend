@@ -42,7 +42,7 @@ class S3Config {
                 .credentialsProvider(credentials(properties))
                 .serviceConfiguration(pathStyle(properties));
         if (properties.usesCustomEndpoint()) {
-            builder.endpointOverride(URI.create(properties.endpoint()));
+            builder.endpointOverride(URI.create(properties.downloadEndpoint()));
         }
         return builder.build();
     }

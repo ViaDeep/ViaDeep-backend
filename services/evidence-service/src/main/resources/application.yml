@@ -37,6 +37,9 @@ viadeep:
     region: ${AWS_REGION:us-east-1}
     # Solo en local (emulador S3 del docker-compose). En AWS se deja vacío y se usan las credenciales del rol de la tarea ECS.
     endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    # Dirección con la que el navegador y el celular descargan las fotos, si es distinta de la que usa el servicio
+    # (en el servidor: el servicio entra por la red interna de Docker y las fotos salen por https).
+    public-endpoint: ${S3_PUBLIC_ENDPOINT:}
     access-key: ${S3_ACCESS_KEY:viadeep}
     secret-key: ${S3_SECRET_KEY:viadeep-dev-secret}
 
