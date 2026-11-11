@@ -47,7 +47,7 @@ services:
   notifications:
     ports: !reset []
     restart: unless-stopped
-    mem_limit: 384m
+    mem_limit: 512m
     environment:
       NOTIFICATIONS_INTERNAL_TOKEN: ${NOTIFICATIONS_INTERNAL_TOKEN:?Falta NOTIFICATIONS_INTERNAL_TOKEN en .env}
 
