@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import pe.viadeep.incident.domain.Assignment;
 import pe.viadeep.incident.domain.Incident;
@@ -21,7 +22,8 @@ final class IncidentDtos {
 
     /**
      * Reporte enviado por la app. Si aiValidated es true, aiResult es obligatorio (clase, confianza y bounding box
-     * de LMD-YOLO); si es false, es un registro manual y el ciudadano elige el tipo.
+     * de LMD-YOLO); si es false, es un registro manual y el ciudadano elige el tipo. type y aiResult son la detección
+     * principal; detections (opcional) trae todas las de la foto, incluidas las que no superaron el umbral.
      */
     record RegisterIncidentRequest(
             @NotNull UUID evidenceId,
@@ -30,7 +32,18 @@ final class IncidentDtos {
             @NotNull @DecimalMin("-180") @DecimalMax("180") Double longitude,
             @Size(max = 500) String description,
             @NotNull Boolean aiValidated,
-            @Valid AiResultRequest aiResult) {
+            @Valid AiResultRequest aiResult,
+            @Valid @Size(max = Incident.MAX_DETECTIONS) List<@NotNull @Valid DetectionRequest> detections) {
+    }
+
+    record DetectionRequest(
+            @NotNull IncidentType type,
+            @NotNull @DecimalMin("0") @DecimalMax("1") Double confidence,
+            @NotNull @DecimalMin("0") @DecimalMax("1") Double bboxX,
+            @NotNull @DecimalMin("0") @DecimalMax("1") Double bboxY,
+            @NotNull @DecimalMin("0") @DecimalMax("1") Double bboxWidth,
+            @NotNull @DecimalMin("0") @DecimalMax("1") Double bboxHeight,
+            @NotNull Boolean accepted) {
     }
 
     record AiResultRequest(

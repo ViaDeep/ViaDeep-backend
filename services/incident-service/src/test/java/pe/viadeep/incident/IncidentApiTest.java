@@ -111,6 +111,56 @@ class IncidentApiTest {
     }
 
     @Test
+    void keepsEveryDetectionOfThePhotoIncludingTheOnesBelowTheThreshold() throws Exception {
+        UUID evidence = ownedEvidence(citizen);
+        String body = """
+                {"evidenceId": "%s", "type": "D20", "latitude": %s, "longitude": %s, "aiValidated": true,
+                 "aiResult": {"confidence": 0.95, "bboxX": 0.6, "bboxY": 0.0, "bboxWidth": 0.4, "bboxHeight": 0.35},
+                 "detections": [
+                   {"type": "D20", "confidence": 0.95, "bboxX": 0.6, "bboxY": 0.0, "bboxWidth": 0.4, "bboxHeight": 0.35,
+                    "accepted": true},
+                   {"type": "D40", "confidence": 0.81, "bboxX": 0.3, "bboxY": 0.0, "bboxWidth": 0.3, "bboxHeight": 0.3,
+                    "accepted": true},
+                   {"type": "D00", "confidence": 0.42, "bboxX": 0.0, "bboxY": 0.5, "bboxWidth": 1.0, "bboxHeight": 0.1,
+                    "accepted": false}]}
+                """.formatted(evidence, lat, lng);
+        String id = json.readTree(mvc.perform(post("/incidents").with(as(citizen, "CITIZEN"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asText();
+
+        mvc.perform(get("/incidents/" + id).with(as(operator, "OPERATOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type", is("D20")))
+                .andExpect(jsonPath("$.detections", hasSize(3)))
+                .andExpect(jsonPath("$.detections[0].type", is("D20")))
+                .andExpect(jsonPath("$.detections[1].type", is("D40")))
+                .andExpect(jsonPath("$.detections[1].accepted", is(true)))
+                .andExpect(jsonPath("$.detections[2].type", is("D00")))
+                .andExpect(jsonPath("$.detections[2].accepted", is(false)));
+    }
+
+    @Test
+    void anOlderAppReportHasItsMainDetectionAsTheOnlyOne() throws Exception {
+        String id = idOf(register(citizen, "D40", lat, lng, true));
+        mvc.perform(get("/incidents/" + id).with(as(citizen, "CITIZEN")))
+                .andExpect(jsonPath("$.detections", hasSize(1)))
+                .andExpect(jsonPath("$.detections[0].type", is("D40")))
+                .andExpect(jsonPath("$.detections[0].accepted", is(true)));
+    }
+
+    @Test
+    void theMainDetectionMustBeOneOfTheAcceptedDetections() throws Exception {
+        UUID evidence = ownedEvidence(citizen);
+        mvc.perform(post("/incidents").with(as(citizen, "CITIZEN")).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"evidenceId": "%s", "type": "D40", "latitude": %s, "longitude": %s, "aiValidated": true,
+                         "aiResult": {"confidence": 0.9, "bboxX": 0.1, "bboxY": 0.1, "bboxWidth": 0.2, "bboxHeight": 0.2},
+                         "detections": [{"type": "D40", "confidence": 0.9, "bboxX": 0.1, "bboxY": 0.1,
+                                         "bboxWidth": 0.2, "bboxHeight": 0.2, "accepted": false}]}
+                        """.formatted(evidence, lat, lng)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void acceptsManualReportsAndChecksTheAiResultIsConsistent() throws Exception {
         register(citizen, "D20", lat, lng, false).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.aiValidated", is(false)));

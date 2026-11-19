@@ -44,7 +44,7 @@ public class RegisterIncidentHandler {
         }
         String district = districts.resolve(command.location()).orElse(null);
         Incident incident = Incident.register(command.reporterId(), evidence.id(), command.type(), command.location(),
-                district, command.description(), command.aiDetection(), clock.instant());
+                district, command.description(), command.aiDetection(), command.detections(), clock.instant());
         List<UUID> duplicates = incidents.findOpenNearby(incident.type(), incident.location(),
                 properties.duplicateRadiusMeters(), incident.id());
         Incident saved = incidents.save(incident);
