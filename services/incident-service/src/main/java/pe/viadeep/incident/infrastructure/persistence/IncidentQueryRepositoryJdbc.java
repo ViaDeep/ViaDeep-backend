@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import pe.viadeep.incident.application.IncidentQueryRepository;
 import pe.viadeep.incident.application.IncidentViews.AiResult;
+import pe.viadeep.incident.application.IncidentViews.Detection;
 import pe.viadeep.incident.application.IncidentViews.HistoryEntry;
 import pe.viadeep.incident.application.IncidentViews.IncidentDetail;
 import pe.viadeep.incident.application.IncidentViews.IncidentFilter;
@@ -106,7 +107,7 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
     public Optional<IncidentDetail> findDetail(UUID id, double duplicateRadiusMeters) {
         return jdbc.sql(SELECT + " WHERE i.id = :id")
                 .param("id", id)
-                .query((rs, row) -> detail(rs, history(id), duplicates(id, duplicateRadiusMeters)))
+                .query((rs, row) -> detail(rs, detections(id), history(id), duplicates(id, duplicateRadiusMeters)))
                 .optional();
     }
 
@@ -151,6 +152,19 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
         return new Statistics(total, byStatus, byType, byDistrict, bySeverity, assigned);
     }
 
+    private List<Detection> detections(UUID incidentId) {
+        return jdbc.sql("""
+                        SELECT t.code, d.confidence, d.bbox_x, d.bbox_y, d.bbox_width, d.bbox_height, d.accepted
+                        FROM incident_detections d JOIN incident_types t ON t.id = d.incident_type_id
+                        WHERE d.incident_id = :id ORDER BY d.position
+                        """)
+                .param("id", incidentId)
+                .query((rs, row) -> new Detection(IncidentType.valueOf(rs.getString("code")),
+                        rs.getDouble("confidence"), rs.getDouble("bbox_x"), rs.getDouble("bbox_y"),
+                        rs.getDouble("bbox_width"), rs.getDouble("bbox_height"), rs.getBoolean("accepted")))
+                .list();
+    }
+
     private List<HistoryEntry> history(UUID incidentId) {
         return jdbc.sql("""
                         SELECT from_status, to_status, changed_by, comment, changed_at
@@ -182,7 +196,8 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
                 .list();
     }
 
-    private static IncidentDetail detail(ResultSet rs, List<HistoryEntry> history, List<UUID> duplicates)
+    private static IncidentDetail detail(ResultSet rs, List<Detection> detections, List<HistoryEntry> history,
+                                         List<UUID> duplicates)
             throws SQLException {
         boolean aiValidated = rs.getBoolean("ai_validated");
         AiResult ai = aiValidated ? new AiResult(rs.getDouble("confidence"), rs.getDouble("bbox_x"),
@@ -190,7 +205,7 @@ class IncidentQueryRepositoryJdbc implements IncidentQueryRepository {
         return new IncidentDetail(uuid(rs, "id"), uuid(rs, "reporter_id"), uuid(rs, "evidence_id"),
                 IncidentType.valueOf(rs.getString("code")), IncidentStatus.valueOf(rs.getString("status")),
                 severity(rs), rs.getDouble("latitude"), rs.getDouble("longitude"), rs.getString("district"),
-                rs.getString("description"), aiValidated, ai, instant(rs, "created_at"), instant(rs, "updated_at"),
+                rs.getString("description"), aiValidated, ai, detections, instant(rs, "created_at"), instant(rs, "updated_at"),
                 rs.getString("assignee"), rs.getString("assigned_area"), rs.getString("assignment_note"),
                 nullableInstant(rs, "assigned_at"), history, duplicates);
     }

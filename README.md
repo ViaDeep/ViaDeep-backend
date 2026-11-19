@@ -39,6 +39,7 @@ Verifica que el servicio responde en `http://localhost:8082/actuator/health`.
 | `DB_HOST` / `DB_PORT` / `DB_NAME` | `localhost` / `5432` / `viadeep` |
 | `DB_USER` / `DB_PASSWORD` | `<esquema>_svc` (solo para desarrollo local) |
 | `S3_ENDPOINT` / `S3_BUCKET` | `http://localhost:9000` / `viadeep-evidences` (emulador S3 local) |
+| `S3_PUBLIC_ENDPOINT` | Vacío: las URLs firmadas de las fotos usan `S3_ENDPOINT`. En el servidor, la dirección pública del almacenamiento (`https://DOMINIO:9443`) |
 | `EVIDENCE_SERVICE_URL` | `http://localhost:8083` (lo usa incidencias para validar la evidencia) |
 | `AUTH_JWKS_URI` | `http://localhost:8081/auth/.well-known/jwks.json` |
 | `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` / `OPERATOR_NAME` | vacíos: no se crea operador. Si se definen, autenticación crea al iniciar el administrador (el encargado que designa la municipalidad; contraseña de 8 caracteres o más). Si ese correo ya existe como operador, lo convierte en administrador |
@@ -84,6 +85,20 @@ MAIL_PASSWORD=la-contraseña-de-aplicación
 ```
 
 Comandos útiles: `docker compose --profile app logs -f auth` (ver los mensajes de un servicio), `docker compose --profile app down` (apagar todo; los datos de la base se conservan). Sin `--profile app`, `docker compose up -d` sigue levantando solo la base y el S3 local.
+
+## Servidor de la demo
+
+`deploy/` levanta todo en una sola máquina virtual con Docker (por ejemplo, Azure for Students): la base, el almacenamiento, los 4 servicios y la plataforma web compilada detrás de Caddy, que obtiene el certificado https de Let's Encrypt. Solo quedan abiertos los puertos 80, 443 y 9443 (descarga de fotos).
+
+```bash
+git clone https://github.com/ViaDeep/ViaDeep-backend.git
+git clone https://github.com/ViaDeep/ViaDeep-webplatform.git
+cd ViaDeep-backend
+bash deploy/primer-arranque.sh   # pregunta el dominio y las cuentas, genera las claves y escribe .env
+docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml --profile app up -d --build
+```
+
+Para actualizar después de un merge a `main`: `bash deploy/actualizar.sh` (los datos se conservan). Las variables están en `deploy/.env.example`; el `.env` del servidor no se sube al repositorio.
 
 ## Operadores municipales
 

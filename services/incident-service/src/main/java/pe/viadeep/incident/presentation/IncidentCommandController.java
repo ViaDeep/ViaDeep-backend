@@ -1,6 +1,7 @@
 package pe.viadeep.incident.presentation;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +19,7 @@ import pe.viadeep.incident.application.ChangeIncidentStatusHandler;
 import pe.viadeep.incident.application.RegisterIncidentCommand;
 import pe.viadeep.incident.application.RegisterIncidentHandler;
 import pe.viadeep.incident.domain.AiDetection;
+import pe.viadeep.incident.domain.DetectedDamage;
 import pe.viadeep.incident.domain.GeoLocation;
 import pe.viadeep.incident.domain.InvalidIncidentException;
 import pe.viadeep.incident.presentation.IncidentDtos.AiResultRequest;
@@ -50,7 +52,7 @@ class IncidentCommandController {
     IncidentResponse register(@Valid @RequestBody RegisterIncidentRequest request, @AuthenticationPrincipal Jwt jwt) {
         RegisterIncidentCommand command = new RegisterIncidentCommand(Jwts.userId(jwt), jwt.getTokenValue(),
                 request.evidenceId(), request.type(), new GeoLocation(request.latitude(), request.longitude()),
-                request.description(), aiDetection(request));
+                request.description(), aiDetection(request), detections(request));
         return IncidentResponse.from(registerIncident.handle(command));
     }
 
@@ -71,6 +73,16 @@ class IncidentCommandController {
                             @AuthenticationPrincipal Jwt jwt) {
         return IncidentResponse.from(assignIncident.handle(id, request.assignee(), request.area(), request.note(),
                 Jwts.userId(jwt)));
+    }
+
+    private static List<DetectedDamage> detections(RegisterIncidentRequest request) {
+        if (request.detections() == null) {
+            return List.of();
+        }
+        return request.detections().stream()
+                .map(d -> new DetectedDamage(d.type(), new AiDetection(d.confidence(), d.bboxX(), d.bboxY(),
+                        d.bboxWidth(), d.bboxHeight()), d.accepted()))
+                .toList();
     }
 
     private static AiDetection aiDetection(RegisterIncidentRequest request) {

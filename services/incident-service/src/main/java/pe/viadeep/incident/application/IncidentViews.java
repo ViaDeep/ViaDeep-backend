@@ -23,13 +23,19 @@ public final class IncidentViews {
     public record AiResult(double confidence, double bboxX, double bboxY, double bboxWidth, double bboxHeight) {
     }
 
+    /** Una detección de LMD-YOLO en la foto; accepted indica si superó el umbral de la app. */
+    public record Detection(IncidentType type, double confidence, double bboxX, double bboxY, double bboxWidth,
+                            double bboxHeight, boolean accepted) {
+    }
+
     public record HistoryEntry(IncidentStatus fromStatus, IncidentStatus toStatus, UUID changedBy, String comment,
                                Instant changedAt) {
     }
 
     public record IncidentDetail(UUID id, UUID reporterId, UUID evidenceId, IncidentType type, IncidentStatus status,
                                  Severity severity, double latitude, double longitude, String district,
-                                 String description, boolean aiValidated, AiResult aiResult, Instant createdAt,
+                                 String description, boolean aiValidated, AiResult aiResult,
+                                 List<Detection> detections, Instant createdAt,
                                  Instant updatedAt, String assignee, String assignedArea, String assignmentNote,
                                  Instant assignedAt, List<HistoryEntry> history, List<UUID> possibleDuplicates) {
     }

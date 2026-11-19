@@ -1,7 +1,9 @@
 package pe.viadeep.incident.infrastructure.persistence;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -10,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -99,6 +102,11 @@ class IncidentJpaEntity {
     @Column(name = "assigned_at")
     private Instant assignedAt;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "incident_detections", joinColumns = @JoinColumn(name = "incident_id"))
+    @OrderColumn(name = "position")
+    private List<DetectionEmbeddable> detections = new ArrayList<>();
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "incident_id", nullable = false, updatable = false)
     @OrderBy("changedAt ASC")
@@ -135,6 +143,7 @@ class IncidentJpaEntity {
             entity.assignedBy = assignment.assignedBy();
             entity.assignedAt = assignment.assignedAt();
         });
+        incident.detections().forEach(detection -> entity.detections.add(DetectionEmbeddable.fromDomain(detection)));
         incident.history().forEach(change -> entity.history.add(StatusHistoryJpaEntity.fromDomain(change)));
         return entity;
     }
@@ -145,7 +154,7 @@ class IncidentJpaEntity {
                 : new Assignment(assignee, assignedArea, assignmentNote, assignedBy, assignedAt);
         return new Incident(id, reporterId, evidenceId, IncidentTypeIds.typeOf(incidentTypeId),
                 new GeoLocation(location.getY(), location.getX()), district, description, status, severity, ai,
-                createdAt, updatedAt, history.stream().map(StatusHistoryJpaEntity::toDomain).toList(),
-                assignment);
+                detections.stream().map(DetectionEmbeddable::toDomain).toList(), createdAt, updatedAt,
+                history.stream().map(StatusHistoryJpaEntity::toDomain).toList(), assignment);
     }
 }

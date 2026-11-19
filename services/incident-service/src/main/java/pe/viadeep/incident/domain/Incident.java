@@ -19,6 +19,7 @@ public final class Incident {
     private final String district;
     private final String description;
     private final AiDetection aiDetection;
+    private final List<DetectedDamage> detections;
     private final Instant createdAt;
     private final List<StatusChange> history;
     private IncidentStatus status;
@@ -28,7 +29,8 @@ public final class Incident {
 
     public Incident(UUID id, UUID reporterId, UUID evidenceId, IncidentType type, GeoLocation location, String district,
                     String description, IncidentStatus status, Severity severity, AiDetection aiDetection,
-                    Instant createdAt, Instant updatedAt, List<StatusChange> history, Assignment assignment) {
+                    List<DetectedDamage> detections, Instant createdAt, Instant updatedAt, List<StatusChange> history,
+                    Assignment assignment) {
         this.id = Objects.requireNonNull(id);
         this.reporterId = Objects.requireNonNull(reporterId);
         this.evidenceId = Objects.requireNonNull(evidenceId);
@@ -39,15 +41,31 @@ public final class Incident {
         this.status = Objects.requireNonNull(status);
         this.severity = severity;
         this.aiDetection = aiDetection;
+        this.detections = List.copyOf(detections);
         this.createdAt = Objects.requireNonNull(createdAt);
         this.updatedAt = Objects.requireNonNull(updatedAt);
         this.history = new ArrayList<>(history);
         this.assignment = assignment;
     }
 
-    /** Crea la incidencia en PENDING con su primer registro de historial, a nombre de quien la reporta. */
+    /** Máximo de detecciones que se guardan por reporte. */
+    public static final int MAX_DETECTIONS = 20;
+
+    /** Registro con una sola detección (o ninguna, si es manual). */
     public static Incident register(UUID reporterId, UUID evidenceId, IncidentType type, GeoLocation location,
                                     String district, String description, AiDetection aiDetection, Instant now) {
+        return register(reporterId, evidenceId, type, location, district, description, aiDetection, List.of(), now);
+    }
+
+    /**
+     * Crea la incidencia en PENDING con su primer registro de historial, a nombre de quien la reporta. type y
+     * aiDetection son la detección principal; detections trae todas las de la foto. Si viene vacía y el reporte es de
+     * la IA, la principal es la única detección.
+     */
+    public static Incident register(UUID reporterId, UUID evidenceId, IncidentType type, GeoLocation location,
+                                    String district, String description, AiDetection aiDetection,
+                                    List<DetectedDamage> detections, Instant now) {
+        List<DetectedDamage> allDetections = checkedDetections(type, aiDetection, detections);
         String cleanDescription = description == null || description.isBlank() ? null : description.strip();
         DescriptionPolicy.problem(cleanDescription).ifPresent(problem -> {
             throw new InappropriateDescriptionException(problem);
@@ -55,7 +73,26 @@ public final class Incident {
         UUID id = UUID.randomUUID();
         StatusChange initial = new StatusChange(UUID.randomUUID(), null, IncidentStatus.PENDING, reporterId, null, now);
         return new Incident(id, reporterId, evidenceId, type, location, district, cleanDescription,
-                IncidentStatus.PENDING, null, aiDetection, now, now, List.of(initial), null);
+                IncidentStatus.PENDING, null, aiDetection, allDetections, now, now, List.of(initial), null);
+    }
+
+    private static List<DetectedDamage> checkedDetections(IncidentType type, AiDetection aiDetection,
+                                                          List<DetectedDamage> detections) {
+        if (detections.isEmpty()) {
+            return aiDetection == null ? List.of() : List.of(new DetectedDamage(type, aiDetection, true));
+        }
+        if (aiDetection == null) {
+            throw new InvalidIncidentException("Un reporte manual no puede traer detecciones de la IA");
+        }
+        if (detections.size() > MAX_DETECTIONS) {
+            throw new InvalidIncidentException("Se aceptan como máximo " + MAX_DETECTIONS + " detecciones");
+        }
+        boolean mainIsAccepted = detections.stream()
+                .anyMatch(d -> d.accepted() && d.type() == type && d.detection().equals(aiDetection));
+        if (!mainIsAccepted) {
+            throw new InvalidIncidentException("La detección principal debe estar entre las detecciones aceptadas");
+        }
+        return detections;
     }
 
     /** Aplica una transición válida (PENDING → IN_PROGRESS → RESOLVED, PENDING → REJECTED). El rechazo exige motivo. */
@@ -141,6 +178,11 @@ public final class Incident {
 
     public Optional<AiDetection> aiDetection() {
         return Optional.ofNullable(aiDetection);
+    }
+
+    /** Todas las detecciones de la foto, en el orden en que las envió la app. */
+    public List<DetectedDamage> detections() {
+        return detections;
     }
 
     public Instant createdAt() {
