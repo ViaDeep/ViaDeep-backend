@@ -1,0 +1,20 @@
+# Buzón SMTP exclusivo para desarrollo local y CI. No se carga salvo que se indique este archivo explícitamente.
+services:
+  mail:
+    image: mailhog/mailhog:v1.0.1
+    # El protocolo SMTP puede incluir el cuerpo del mensaje; no lo conservamos en los logs del contenedor.
+    logging:
+      driver: "none"
+    ports:
+      - "8025:8025"
+
+  auth:
+    depends_on:
+      mail:
+        condition: service_started
+    environment:
+      MAIL_HOST: mail
+      MAIL_PORT: 1025
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
+      MAIL_FROM: ViaDeep <no-reply@viadeep.local>

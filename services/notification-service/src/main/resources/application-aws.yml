@@ -1,0 +1,17 @@
+# Configuración obligatoria para ECS/Fargate. Los placeholders sin valor por defecto
+# impiden usar accidentalmente JDBC local, localhost o el token interno de desarrollo.
+spring:
+  datasource:
+    url: "jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?currentSchema=notifications&sslmode=verify-full&sslrootcert=${DB_SSL_ROOT_CERT}"
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${VIADEEP_JWT_ISSUER}
+          jwk-set-uri: ${AUTH_JWKS_URI}
+
+viadeep:
+  internal-api:
+    token: ${NOTIFICATIONS_INTERNAL_TOKEN}

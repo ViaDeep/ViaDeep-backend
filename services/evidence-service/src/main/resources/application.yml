@@ -6,8 +6,9 @@ spring:
     name: evidence-service
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 11MB
+      # ADR-005: máximo 5 MB decimales por fotografía; el multipart total conserva 6 MiB.
+      max-file-size: 5000000B
+      max-request-size: 6291456B
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:viadeep}?currentSchema=evidences
     username: ${DB_USER:evidences_svc}
@@ -23,6 +24,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
+          issuer-uri: ${VIADEEP_JWT_ISSUER:viadeep-auth}
           jwk-set-uri: ${AUTH_JWKS_URI:http://localhost:8081/auth/.well-known/jwks.json}
   flyway:
     schemas: evidences
@@ -30,7 +32,8 @@ spring:
 
 viadeep:
   evidence:
-    max-size-bytes: ${EVIDENCE_MAX_SIZE_BYTES:10485760}
+    # Segunda barrera en el dominio, con el mismo límite decimal que el parser multipart.
+    max-size-bytes: 5000000
     url-ttl: ${EVIDENCE_URL_TTL:10m}
   s3:
     bucket: ${S3_BUCKET:viadeep-evidences}

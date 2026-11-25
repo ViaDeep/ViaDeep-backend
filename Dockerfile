@@ -22,8 +22,14 @@ RUN --mount=type=cache,target=/root/.m2,sharing=locked \
     && cp services/${SERVICE}/target/${SERVICE}-*.jar /app.jar
 
 FROM eclipse-temurin:21-jre
-RUN useradd --system --uid 10001 viadeep
+RUN useradd --system --uid 10001 viadeep \
+    && install -d -o root -g root -m 0755 /app/certs
+ADD --checksum=sha256:90a6f1a7978a1b1b096dca6c57511ca48d3b8cf052f8e704baf358f34ea2f21b \
+    https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem \
+    /app/certs/global-bundle.pem
+RUN chmod 0444 /app/certs/global-bundle.pem
 COPY --from=build /app.jar /app/app.jar
+ENV DB_SSL_ROOT_CERT=/app/certs/global-bundle.pem
 USER viadeep
 # Cada servicio lee su puerto de PORT (8081 auth, 8082 incidencias, 8083 evidencias, 8084 notificaciones).
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]

@@ -4,6 +4,14 @@ spring:
     username: sa
     password:
 
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+      mail.smtp.starttls.required: false
+
 viadeep:
   initial-operator:
     email: operador@muni.pe
@@ -11,3 +19,5 @@ viadeep:
     full-name: Operadora de prueba
   operators:
     allowed-email-domains: muni.pe
+  mail:
+    from: no-reply@viadeep.local

@@ -51,12 +51,13 @@ services:
       OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:-}
       OPERATOR_NAME: ${OPERATOR_NAME:-Operador municipal}
       OPERATOR_EMAIL_DOMAINS: ${OPERATOR_EMAIL_DOMAINS:-}
-      # Gmail para enviar los códigos de verificación y de cambio de contraseña. Sin MAIL_HOST van solo al log.
+      # SMTP para enviar los códigos. Sin MAIL_HOST se omite el envío sin registrar el contenido del correo.
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      VIADEEP_JWT_ISSUER: ${VIADEEP_JWT_ISSUER:-viadeep-auth}
       # Sin clave fija, cada reinicio de auth genera otra y hay que volver a iniciar sesión.
       VIADEEP_JWT_PRIVATE_KEY: ${VIADEEP_JWT_PRIVATE_KEY:-}
     ports:
@@ -72,6 +73,7 @@ services:
       DB_USER: incidents_svc
       DB_PASSWORD: incidents_svc
       AUTH_JWKS_URI: http://auth:8081/auth/.well-known/jwks.json
+      VIADEEP_JWT_ISSUER: ${VIADEEP_JWT_ISSUER:-viadeep-auth}
       EVIDENCE_SERVICE_URL: http://evidences:8083
       NOTIFICATION_SERVICE_URL: http://notifications:8084
     ports:
@@ -89,6 +91,7 @@ services:
       DB_USER: evidences_svc
       DB_PASSWORD: evidences_svc
       AUTH_JWKS_URI: http://auth:8081/auth/.well-known/jwks.json
+      VIADEEP_JWT_ISSUER: ${VIADEEP_JWT_ISSUER:-viadeep-auth}
       # Las URLs de las fotos llevan esta dirección, así que tiene que ser una que vean el navegador y el celular.
       S3_ENDPOINT: http://${PC_IP:-host.docker.internal}:9000
     extra_hosts:
@@ -106,6 +109,7 @@ services:
       DB_USER: notifications_svc
       DB_PASSWORD: notifications_svc
       AUTH_JWKS_URI: http://auth:8081/auth/.well-known/jwks.json
+      VIADEEP_JWT_ISSUER: ${VIADEEP_JWT_ISSUER:-viadeep-auth}
     ports:
       - "8084:8084"
 

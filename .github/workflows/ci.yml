@@ -44,9 +44,12 @@ jobs:
 
   compose:
     runs-on: ubuntu-latest
+    env:
+      # Añade un buzón SMTP controlado solo a esta prueba; el compose base permanece sin servidor de correo.
+      COMPOSE_FILE: docker-compose.yml:infra/mail/docker-compose.mail.yml
     steps:
       - uses: actions/checkout@v4
-      - name: Levantar la base, S3 y los 4 microservicios
+      - name: Levantar la base, S3, SMTP de prueba y los 4 microservicios
         run: |
           # Las URLs de las fotos llevan la IP de la máquina, como la de la PC en el Wi-Fi.
           echo "PC_IP=$(hostname -I | awk '{print $1}')" > .env
@@ -64,9 +67,16 @@ jobs:
         run: |
           curl -fsS -X POST http://localhost:8081/auth/register -H 'Content-Type: application/json' \
             -d '{"email":"ciudadano@example.com","password":"ClaveSegura123","fullName":"Ciudadano CI"}'
-          # Sin MAIL_HOST el correo con el código solo se escribe en el log de autenticación.
-          code=$(docker compose --profile app logs --no-color --no-log-prefix auth \
-            | grep -A5 'Correo para ciudadano@example.com' | grep -oE 'es: [0-9]{6}' | tail -1 | cut -d' ' -f2)
+          # El código se consulta en el buzón SMTP efímero, nunca en los logs del servicio.
+          code=""
+          for i in $(seq 1 30); do
+            messages=$(curl -fsS http://localhost:8025/api/v2/messages || true)
+            if [ -n "$messages" ]; then
+              code=$(printf '%s' "$messages" | python3 -c 'import json,re,sys; data=json.load(sys.stdin); texts=[" ".join(message.get("Content", {}).get("Headers", {}).get("Subject", []) + [message.get("Content", {}).get("Body", "")]) for message in data.get("items", [])]; matches=[re.search(r"\b(\d{6})\b", text) for text in texts]; print(next((match.group(1) for match in matches if match), ""))')
+            fi
+            [ -n "$code" ] && break
+            sleep 1
+          done
           test -n "$code"
           curl -fsS -X POST http://localhost:8081/auth/email/verify -H 'Content-Type: application/json' \
             -d "{\"email\":\"ciudadano@example.com\",\"code\":\"$code\"}" | grep -q accessToken

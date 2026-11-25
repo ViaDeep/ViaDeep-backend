@@ -12,7 +12,7 @@ Todos requieren el token JWT del usuario (`Authorization: Bearer <token>`).
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/evidences` | Sube la fotografía (multipart, campo `file`). Solo JPEG o PNG, hasta 10 MB; el formato se verifica por el contenido del archivo, no por lo que declara el cliente. Responde 201 con el `id` de la evidencia. |
+| POST | `/evidences` | Sube la fotografía (multipart, campo `file`). Solo JPEG o PNG, hasta 5 MB exactos (5 000 000 bytes); el formato se verifica por el contenido del archivo, no por lo que declara el cliente. Responde 201 con el `id` de la evidencia y 413 si el multipart supera el límite. |
 | GET | `/evidences/{id}` | Metadatos de la evidencia. Lo usa también el servicio de incidencias para validar el reporte. |
 | GET | `/evidences/{id}/url` | URL firmada de descarga directa desde S3, válida 10 minutos. |
 
