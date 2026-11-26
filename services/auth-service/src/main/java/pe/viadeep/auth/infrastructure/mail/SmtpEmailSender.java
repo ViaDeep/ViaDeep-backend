@@ -2,6 +2,7 @@ package pe.viadeep.auth.infrastructure.mail;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.MailException;
@@ -29,8 +30,24 @@ class SmtpEmailSender implements EmailSender {
         this.sender = sender;
     }
 
+    /**
+     * Spring Boot solo crea el JavaMailSender si hay spring.mail.host (perfil aws). Sin él, en desarrollo y en las
+     * pruebas de docker compose, el correo solo se escribe en el log, como antes.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    SmtpEmailSender(
+            MailProperties properties,
+            ObjectProvider<JavaMailSender> sender
+    ) {
+        this(properties, sender.getIfAvailable());
+    }
+
     @Override
     public void send(String to, String subject, String body) {
+        if (sender == null) {
+            log.warn("Sin servidor de correo (MAIL_HOST vacío). Correo para {}: {}\n{}", to, subject, body);
+            return;
+        }
         SimpleMailMessage message = new SimpleMailMessage();
 
         message.setFrom(properties.from());

@@ -108,4 +108,13 @@ class SmtpEmailSenderTest {
                 .contains("MailSendException | SendFailedException")
                 .doesNotContain("persona@example.com", "123456", "550");
     }
+
+    @Test
+    void withoutAMailServerTheEmailOnlyGoesToTheLog(CapturedOutput output) {
+        SmtpEmailSender sender = new SmtpEmailSender(new MailProperties(""), (JavaMailSender) null);
+
+        sender.send("persona@example.com", "Codigo", "Tu codigo es 654321");
+
+        assertThat(output.getAll()).contains("Sin servidor de correo", "654321");
+    }
 }
