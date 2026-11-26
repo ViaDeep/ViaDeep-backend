@@ -115,6 +115,19 @@ class SmtpEmailSenderTest {
 
         sender.send("persona@example.com", "Codigo", "Tu codigo es 654321");
 
-        assertThat(output.getAll()).contains("Sin servidor de correo", "654321");
+        assertThat(output.getAll()).contains("Sin servidor de correo").doesNotContain("654321", "persona@example.com");
+    }
+
+    @Test
+    void outsideAwsTheSenderIsBuiltFromTheMailVariables() {
+        org.springframework.mock.env.MockEnvironment environment = new org.springframework.mock.env.MockEnvironment()
+                .withProperty("MAIL_HOST", "mail").withProperty("MAIL_PORT", "1025");
+
+        JavaMailSender built = SmtpEmailSender.fromEnvironment(environment);
+
+        assertThat(built).isInstanceOf(org.springframework.mail.javamail.JavaMailSenderImpl.class);
+        assertThat(((org.springframework.mail.javamail.JavaMailSenderImpl) built).getHost()).isEqualTo("mail");
+        assertThat(((org.springframework.mail.javamail.JavaMailSenderImpl) built).getPort()).isEqualTo(1025);
+        assertThat(SmtpEmailSender.fromEnvironment(new org.springframework.mock.env.MockEnvironment())).isNull();
     }
 }
