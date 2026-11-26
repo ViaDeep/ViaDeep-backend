@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.MailException;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
@@ -47,11 +48,39 @@ class SmtpEmailSender implements EmailSender {
         try {
             sender.send(message);
         } catch (MailAuthenticationException exception) {
-            log.error("El servidor SMTP rechazó la autenticación");
+            log.error("El servidor SMTP rechazó la autenticación (causa: {})", causes(exception));
             throw exception;
         } catch (MailException exception) {
-            log.error("No se pudo enviar el correo por SMTP");
+            log.error("No se pudo enviar el correo por SMTP (causa: {})", causes(exception));
             throw exception;
         }
+    }
+
+    /**
+     * Solo los nombres de las clases de la cadena de causas (por ejemplo AuthenticationFailedException,
+     * UnknownHostException o SocketTimeoutException): bastan para saber si falló la clave, el servidor o la red, sin
+     * escribir en el log mensajes que pueden traer el usuario, el destinatario o el código.
+     */
+    static String causes(Throwable exception) {
+        StringBuilder names = new StringBuilder(chain(exception));
+        // Si el servidor rechazó el mensaje ya conectado (remitente o destinatario), Spring guarda el error de cada
+        // mensaje aparte y no como causa.
+        if (exception instanceof MailSendException send) {
+            send.getFailedMessages().values().forEach(failure -> names.append(" | ").append(chain(failure)));
+        }
+        return names.toString();
+    }
+
+    private static String chain(Throwable exception) {
+        StringBuilder names = new StringBuilder();
+        Throwable current = exception;
+        for (int depth = 0; current != null && depth < 6; depth++) {
+            if (names.length() > 0) {
+                names.append(" <- ");
+            }
+            names.append(current.getClass().getSimpleName());
+            current = current.getCause() == current ? null : current.getCause();
+        }
+        return names.toString();
     }
 }

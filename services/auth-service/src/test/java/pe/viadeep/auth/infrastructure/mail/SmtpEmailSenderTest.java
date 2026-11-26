@@ -76,4 +76,36 @@ class SmtpEmailSenderTest {
                         "123456"
                 );
     }
+
+    @Test
+    void theLogNamesTheKindOfFailureWithoutItsMessage(CapturedOutput output) {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        doThrow(new MailSendException("smtp.gmail.com unreachable for persona@example.com",
+                new java.net.UnknownHostException("smtp.gmail.com")))
+                .when(mailSender).send(any(SimpleMailMessage.class));
+        SmtpEmailSender sender = new SmtpEmailSender(new MailProperties("viadeep.tesis@gmail.com"), mailSender);
+
+        assertThatThrownBy(() -> sender.send("persona@example.com", "Codigo 123456", "Codigo 123456"))
+                .isInstanceOf(MailSendException.class);
+
+        assertThat(output.getAll())
+                .contains("MailSendException <- UnknownHostException")
+                .doesNotContain("persona@example.com", "123456", "unreachable");
+    }
+
+    @Test
+    void theLogAlsoNamesTheFailureOfEachRejectedMessage(CapturedOutput output) {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        doThrow(new MailSendException(java.util.Map.of(new Object(),
+                new jakarta.mail.SendFailedException("550 rejected persona@example.com"))))
+                .when(mailSender).send(any(SimpleMailMessage.class));
+        SmtpEmailSender sender = new SmtpEmailSender(new MailProperties("viadeep.tesis@gmail.com"), mailSender);
+
+        assertThatThrownBy(() -> sender.send("persona@example.com", "Codigo 123456", "Codigo 123456"))
+                .isInstanceOf(MailSendException.class);
+
+        assertThat(output.getAll())
+                .contains("MailSendException | SendFailedException")
+                .doesNotContain("persona@example.com", "123456", "550");
+    }
 }
