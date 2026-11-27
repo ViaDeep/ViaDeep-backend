@@ -76,4 +76,58 @@ class SmtpEmailSenderTest {
                         "123456"
                 );
     }
+
+    @Test
+    void theLogNamesTheKindOfFailureWithoutItsMessage(CapturedOutput output) {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        doThrow(new MailSendException("smtp.gmail.com unreachable for persona@example.com",
+                new java.net.UnknownHostException("smtp.gmail.com")))
+                .when(mailSender).send(any(SimpleMailMessage.class));
+        SmtpEmailSender sender = new SmtpEmailSender(new MailProperties("viadeep.tesis@gmail.com"), mailSender);
+
+        assertThatThrownBy(() -> sender.send("persona@example.com", "Codigo 123456", "Codigo 123456"))
+                .isInstanceOf(MailSendException.class);
+
+        assertThat(output.getAll())
+                .contains("MailSendException <- UnknownHostException")
+                .doesNotContain("persona@example.com", "123456", "unreachable");
+    }
+
+    @Test
+    void theLogAlsoNamesTheFailureOfEachRejectedMessage(CapturedOutput output) {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        doThrow(new MailSendException(java.util.Map.of(new Object(),
+                new jakarta.mail.SendFailedException("550 rejected persona@example.com"))))
+                .when(mailSender).send(any(SimpleMailMessage.class));
+        SmtpEmailSender sender = new SmtpEmailSender(new MailProperties("viadeep.tesis@gmail.com"), mailSender);
+
+        assertThatThrownBy(() -> sender.send("persona@example.com", "Codigo 123456", "Codigo 123456"))
+                .isInstanceOf(MailSendException.class);
+
+        assertThat(output.getAll())
+                .contains("MailSendException | SendFailedException")
+                .doesNotContain("persona@example.com", "123456", "550");
+    }
+
+    @Test
+    void withoutAMailServerTheEmailOnlyGoesToTheLog(CapturedOutput output) {
+        SmtpEmailSender sender = new SmtpEmailSender(new MailProperties(""), (JavaMailSender) null);
+
+        sender.send("persona@example.com", "Codigo", "Tu codigo es 654321");
+
+        assertThat(output.getAll()).contains("Sin servidor de correo").doesNotContain("654321", "persona@example.com");
+    }
+
+    @Test
+    void outsideAwsTheSenderIsBuiltFromTheMailVariables() {
+        org.springframework.mock.env.MockEnvironment environment = new org.springframework.mock.env.MockEnvironment()
+                .withProperty("MAIL_HOST", "mail").withProperty("MAIL_PORT", "1025");
+
+        JavaMailSender built = SmtpEmailSender.fromEnvironment(environment);
+
+        assertThat(built).isInstanceOf(org.springframework.mail.javamail.JavaMailSenderImpl.class);
+        assertThat(((org.springframework.mail.javamail.JavaMailSenderImpl) built).getHost()).isEqualTo("mail");
+        assertThat(((org.springframework.mail.javamail.JavaMailSenderImpl) built).getPort()).isEqualTo(1025);
+        assertThat(SmtpEmailSender.fromEnvironment(new org.springframework.mock.env.MockEnvironment())).isNull();
+    }
 }
